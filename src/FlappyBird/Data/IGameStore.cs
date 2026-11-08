@@ -1,11 +1,12 @@
 using FlappyBird.Models;
 namespace FlappyBird.Data;
-
 public interface IGameStore
 {
     Task InitializeAsync();
-    Task SaveResultAsync(GameResult result);
-    Task<IReadOnlyList<GameResult>> GetTopAsync();
+    Task<SaveOutcome> SaveResultAsync(GameResult result);
+    Task<IReadOnlyList<GameResult>> GetTopAsync(Difficulty difficulty);
+    Task<GameStatistics> GetStatisticsAsync();
+    Task<IReadOnlyList<AchievementProgress>> GetAchievementsAsync();
     Task<PlayerSettings> GetSettingsAsync();
     Task SaveSettingsAsync(PlayerSettings settings);
 }

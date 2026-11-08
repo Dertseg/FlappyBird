@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:FlappyBird.ViewModels" x:Class="FlappyBird.Views.Controls.StatusBanner" x:DataType="vm:BaseViewModel">
+  <VerticalStackLayout Spacing="8">
+    <ActivityIndicator IsVisible="{Binding IsBusy}" IsRunning="{Binding IsBusy}" Color="{StaticResource Accent}" HeightRequest="24" />
+    <Border IsVisible="{Binding HasStatus}" BackgroundColor="#E7EEF5" StrokeThickness="0" StrokeShape="RoundRectangle 14" Padding="14,10">
+      <Label Text="{Binding Status}" FontSize="13" LineHeight="1.2" />
+    </Border>
+  </VerticalStackLayout>
+</ContentView>

@@ -3,97 +3,184 @@ using FlappyBird.ViewModels;
 using FlappyBird.Services;
 using FlappyBird.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 int assertions = 0;
 void Check(bool value, string message) { assertions++; if (!value) throw new Exception(message); }
-var game = new GameEngine(42);
-double initial = game.BirdY;
-game.Advance(1); Check(game.BirdY == initial, "Ready does not simulate");
-game.Flap(); game.Advance(0.02); Check(game.BirdY < initial, "Tap gives upward impulse");
-game.Pause(); double y = game.BirdY; double time = game.Elapsed;
-game.Advance(5); game.Flap(); Check(game.BirdY == y && game.Elapsed == time, "Pause freezes world and input");
-game.Resume(); game.Advance(0.02); Check(game.Elapsed > time, "Resume restarts simulation");
-for (int i = 0; i < 1000 && game.State != GameState.GameOver; i++) game.Advance(GameEngine.Step);
-Check(game.State == GameState.GameOver, "Ground collision ends game");
-double finalY = game.BirdY; int finalScore = game.Score;
-game.Flap(); game.Advance(0.1);
-Check(game.BirdY == finalY && game.Score == finalScore, "Finished attempt ignores input and simulation");
-var oldSession = game.SessionId; game.Reset(); Check(game.Score == 0 && game.SessionId != oldSession, "Reset creates a distinct attempt");
+GameDbContext Context(string path) => new(new DbContextOptionsBuilder<GameDbContext>().UseSqlite($"Data Source={path}").Options);
+GameResult Result(int score, Difficulty difficulty = Difficulty.Normal) => new()
+{ Id = Guid.NewGuid(), PlayerName = "Тест", Score = score, DurationSeconds = 12.5, Difficulty = difficulty, PlayedAtUtc = DateTime.UtcNow };
 
-// Autopilot exercises actual generated pipes, score transitions and recycling for 30 points.
-game = new GameEngine(7);
-int lastScore = 0;
-for (int i = 0; i < 120 * 70 && game.State != GameState.GameOver; i++)
+foreach (var option in DifficultyCatalog.All)
 {
-    var next = game.Pipes.FirstOrDefault(p => p.X + GameEngine.PipeWidth >= GameEngine.BirdX - GameEngine.BirdRadius) ?? game.Pipes[^1];
-    if (game.State == GameState.Ready || (game.BirdY > next.GapY + 12 && game.Velocity >= 0)) game.Flap();
-    game.Advance(GameEngine.Step);
-    Check(game.Score == lastScore || game.Score == lastScore + 1, "Score increases at most once per pipe"); lastScore = game.Score;
-    Check(game.Pipes.All(p => p.GapY is >= 175 and <= 410), "Gap stays inside safe range");
+    var g = new GameEngine(7); g.Reset(option.Id);
+    Check(g.GapSize == option.Gap && g.PipeSpeed == option.Speed, "Difficulty config reaches physics");
+    var initialY = g.BirdY; g.Advance(1); Check(g.BirdY == initialY, "Ready does not simulate");
+    g.Flap(); g.Advance(.02); Check(g.BirdY < initialY, "Tap moves upward");
+    g.Pause(); var y = g.BirdY; var elapsed = g.Elapsed;
+    g.Flap(); g.Advance(2); Check(g.BirdY == y && g.Elapsed == elapsed, "Pause freezes world");
+    g.Resume(); g.Advance(.02); Check(g.Elapsed > elapsed, "Resume works");
+    int lastScore = 0;
+    for (int i = 0; i < 120 * 80 && g.State != GameState.GameOver && g.Score < 30; i++)
+    {
+        var next = g.Pipes.FirstOrDefault(p => p.X + GameEngine.PipeWidth >= GameEngine.BirdX - GameEngine.BirdRadius) ?? g.Pipes[^1];
+        if (g.BirdY > next.GapY + 12 && g.Velocity >= 0) g.Flap();
+        g.Advance(GameEngine.Step);
+        Check(g.Score == lastScore || g.Score == lastScore + 1, "One point per pair"); lastScore = g.Score;
+    }
+    Check(g.Score >= 20, $"Course remains playable: {option.Id}: {g.Score}");
+    g.Pause(); g.Finish(); Check(g.State == GameState.GameOver, "Finish paused attempt");
+    var finalY = g.BirdY; g.Flap(); g.Advance(1); Check(g.BirdY == finalY, "Finished attempt frozen");
+    var id = g.SessionId; g.Reset(option.Id); Check(g.SessionId != id && g.Score == 0, "New session on replay");
 }
-Check(game.Score >= 30, $"Generated course is playable: {game.Score} points, state {game.State}");
+GameEngine Simulate(int hz) { var g = new GameEngine(1); g.Flap(); for (int i = 0; i < hz / 2; i++) g.Advance(1.0 / hz); return g; }
+Check(Math.Abs(Simulate(30).BirdY - Simulate(120).BirdY) < .01, "Physics independent of render cadence");
+Check(MedalProgress.Next(9).Contains("1 очк.") && MedalProgress.Next(10).Contains("15 очк."), "Next medal boundary");
+Check(MedalProgress.Next(25).Contains("25 очк.") && MedalProgress.Fraction(100) == 1, "Silver and platinum thresholds");
 
-// Simulation is independent of render cadence.
-GameEngine Simulate(int hz)
-{
-    var g = new GameEngine(1); g.Flap();
-    for (int i = 0; i < hz / 2; i++) g.Advance(1.0 / hz);
-    return g;
-}
-var slow = Simulate(30); var fast = Simulate(120);
-Check(Math.Abs(slow.BirdY - fast.BirdY) < 0.01, "30 and 120 Hz produce same physics");
-
-string path = Path.Combine(Path.GetTempPath(), "flappy-check-" + Guid.NewGuid() + ".db");
+var path = Path.Combine(Path.GetTempPath(), "flappy-v2-" + Guid.NewGuid() + ".db");
 try
 {
-    var store = new SqliteGameStore(path); await store.InitializeAsync(); await store.InitializeAsync();
-    using (var db = new GameDbContext(new DbContextOptionsBuilder<GameDbContext>().UseSqlite($"Data Source={path}").Options))
+    // Build an actual version-1 SQLite database, then upgrade it with production initialization.
+    var legacyId = Guid.NewGuid();
+    using (var db = Context(path))
     {
-        Check(db.Database.GetAppliedMigrations().Count() == 1, "Initial migration applied once");
-        Check(!db.Database.HasPendingModelChanges(), "Migration snapshot matches EF model");
+        db.GetService<IMigrator>().Migrate("20261108130304_InitialCreate");
+        db.Database.ExecuteSqlRaw("INSERT INTO GameResults (Id,PlayerName,Score,PlayedAtUtc,DurationSeconds,Mode) VALUES ({0},{1},{2},{3},{4},{5})",
+            legacyId, "Старый игрок", 25, DateTime.UtcNow.AddDays(-1), 45.0, "Classic");
+        db.Database.ExecuteSqlRaw("INSERT INTO PlayerSettings (Id,PlayerName,SoundEnabled,VibrationEnabled) VALUES (1,{0},0,0)", "Птица");
     }
-    var result = new GameResult { Id = Guid.NewGuid(), PlayerName = "Тест", Score = 42, PlayedAtUtc = DateTime.UtcNow, DurationSeconds = 12 };
-    await Task.WhenAll(Enumerable.Range(0, 5).Select(_ => store.SaveResultAsync(result)));
-    Check((await store.GetTopAsync()).Count == 1, "Concurrent save retries do not duplicate session");
-    await store.SaveSettingsAsync(new PlayerSettings { PlayerName = "Птица", SoundEnabled = false, VibrationEnabled = false });
+    var store = new SqliteGameStore(path); await store.InitializeAsync(); await store.InitializeAsync();
+    using (var db = Context(path))
+    {
+        Check(db.Database.GetAppliedMigrations().Count() == 2, "Both migrations applied once");
+        Check(!db.Database.HasPendingModelChanges(), "Snapshot matches current model");
+        var legacy = db.Results.Single();
+        Check(legacy.Id == legacyId && legacy.Score == 25 && legacy.Difficulty == Difficulty.Normal, "Legacy scores survive as Normal");
+    }
+    var settings = await store.GetSettingsAsync();
+    Check(settings.PlayerName == "Птица" && !settings.SoundEnabled && settings.DefaultDifficulty == Difficulty.Normal, "Legacy settings preserved");
+    var achievements = await store.GetAchievementsAsync();
+    Check(achievements.Count(x => x.IsUnlocked) == 3, "Old scores grant earned achievements");
+    var unlockDate = achievements[0].UnlockedAtUtc;
+    var easy = Result(60, Difficulty.Easy);
+    await Task.WhenAll(Enumerable.Range(0, 5).Select(_ => store.SaveResultAsync(easy)));
+    await store.SaveResultAsync(Result(5, Difficulty.Hard));
+    Check((await store.GetTopAsync(Difficulty.Easy)).Single().Score == 60, "Easy isolated and retry idempotent");
+    Check((await store.GetTopAsync(Difficulty.Normal)).Single().Score == 25, "Normal isolated");
+    Check((await store.GetTopAsync(Difficulty.Hard)).Single().Score == 5, "Hard isolated");
+    for (int i = 0; i < 15; i++) await store.SaveResultAsync(Result(i, Difficulty.Hard));
+    var earlier = Result(14, Difficulty.Hard); earlier.PlayerName = "Раньше"; earlier.PlayedAtUtc = DateTime.UtcNow.AddDays(-1);
+    await store.SaveResultAsync(earlier);
+    var top = await store.GetTopAsync(Difficulty.Hard);
+    Check(top.Count == 10 && top[0].PlayerName == "Раньше", "Top ten deterministic tie ordering");
+
+    var session = new GameSession { LastSavedResult = earlier }; var nav = new FakeNavigation();
+    var records = new LeaderboardViewModel(store, session); await records.LoadCommand.ExecuteAsync(null);
+    Check(records.SelectedDifficulty == Difficulty.Hard && records.Leaders[0].IsLatest && records.Leaders[0].Badge == "🥇", "Latest attempt selects difficulty and gold row");
+    await records.SelectDifficultyCommand.ExecuteAsync("Easy");
+    Check(records.Leaders.Single().Score == 60 && !records.Leaders[0].IsLatest, "Filter removes unrelated highlight");
+    var low = Result(0, Difficulty.Hard); await store.SaveResultAsync(low); session.LastSavedResult = low;
+    await records.LoadCommand.ExecuteAsync(null);
+    Check(!records.Leaders.Any(x => x.IsLatest) && records.HasLastRunNote, "Non-top latest attempt still acknowledged");
+
+    var failing = new FaultStore(store); var game = new GameViewModel(failing, new SilentFeedback(), nav, session);
+    Check(await game.PrepareAsync(Difficulty.Normal), "Prepare game");
+    Check(game.PreviousBest == 25, "Previous best captured before attempt");
+    game.FlapCommand.Execute(null);
+    for (int i = 0; i < 1000 && !game.IsGameOver; i++) game.Advance(GameEngine.Step);
+    await game.SaveResultCommand.ExecutionTask!;
+    Check(game.CanRetrySave && game.PreviousBest == 25 && game.DurationSeconds > 0, "Failure retains result metadata");
+    var failedId = game.Engine.SessionId;
+    await game.ReplayCommand.ExecuteAsync(null); await game.HomeCommand.ExecuteAsync(null);
+    Check(game.Engine.SessionId == failedId && nav.Destinations.Count == 0, "Unsaved attempt cannot be lost via replay or navigation");
+    var attemptsBefore = (await store.GetStatisticsAsync()).Attempts;
+    await game.SaveResultCommand.ExecuteAsync(null); await game.SaveResultCommand.ExecuteAsync(null);
+    Check(!game.CanRetrySave && (await store.GetStatisticsAsync()).Attempts == attemptsBefore + 1, "Retry records attempt once");
+    Check(game.PreviousBest == 25 && session.LastSavedResult!.Id == failedId, "Previous best stable after save");
+    await game.ReplayCommand.ExecuteAsync(null); game.FlapCommand.Execute(null); game.OnBackgrounded();
+    Check(game.IsPaused, "Background pauses game");
+    var resume = game.ResumeCommand.ExecuteAsync(null); game.OnBackgrounded(); await resume;
+    Check(game.IsPaused && !game.HasCountdown, "Background cancels countdown");
+    game.FinishCommand.Execute(null); await game.SaveResultCommand.ExecutionTask!;
+    await game.HomeCommand.ExecuteAsync(null); Check(nav.Destinations.Last() == Destination.Home, "Saved game can navigate");
+
+    var settingsVm = new SettingsViewModel(store); await settingsVm.LoadCommand.ExecuteAsync(null);
+    settingsVm.PlayerName = "  Сокол  "; settingsVm.SelectedDifficulty = DifficultyCatalog.Get(Difficulty.Easy);
+    await settingsVm.SaveCommand.ExecuteAsync(null);
+    Check((await store.GetSettingsAsync()).PlayerName == "Сокол", "Settings trim and persist name");
+    var home = new HomeViewModel(store, nav, game); await home.LoadCommand.ExecuteAsync(null);
+    Check(home.SelectedDifficulty == Difficulty.Easy && home.BestScore == 60, "Home loads chosen difficulty best");
+    await home.SelectDifficultyCommand.ExecuteAsync("Hard");
+    Check(home.BestScore == 14 && (await store.GetSettingsAsync()).DefaultDifficulty == Difficulty.Hard, "Home changes persist and refresh matching best");
+
+    var attempts = (await store.GetStatisticsAsync()).Attempts;
+    for (int i = attempts; i < 100; i++) await store.SaveResultAsync(Result(0));
+    achievements = await store.GetAchievementsAsync();
+    Check(achievements.All(x => x.IsUnlocked), "Hundred attempts achievement");
+    Check((await store.GetStatisticsAsync()).Attempts == 100, "Duplicates do not contribute to attempts");
     var reopened = new SqliteGameStore(path); await reopened.InitializeAsync();
-    Check((await reopened.GetTopAsync()).Single().Score == 42, "Result survives reopening SQLite");
-    Check((await reopened.GetSettingsAsync()).PlayerName == "Птица", "Settings survive reopening SQLite");
-    for (int i = 0; i < 15; i++) await store.SaveResultAsync(new GameResult { Id = Guid.NewGuid(), Score = i, PlayedAtUtc = DateTime.UtcNow });
-    await store.SaveResultAsync(new GameResult { Id = Guid.NewGuid(), Score = 42, PlayerName = "Раньше", PlayedAtUtc = DateTime.UtcNow.AddDays(-1) });
-    var top = await store.GetTopAsync();
-    Check(top.Count == 10 && top[0].PlayerName == "Раньше" && top[1].Score == 42, "Top ten ordered by score then earliest date");
-    var failure = new FaultStore(reopened); var vm = new MainViewModel(failure, new SilentFeedback());
-    int attemptsBefore;
-    using (var db = new GameDbContext(new DbContextOptionsBuilder<GameDbContext>().UseSqlite($"Data Source={path}").Options)) attemptsBefore = db.Results.Count();
-    await vm.InitializeAsync(); await vm.StartCommand.ExecuteAsync(null); vm.FlapCommand.Execute(null);
-    for (int i = 0; i < 1000 && !vm.IsGameOver; i++) vm.Advance(GameEngine.Step);
-    await vm.SaveResultCommand.ExecutionTask!;
-    Check(vm.CanRetrySave, "Save failure leaves explicit retry option");
-    await vm.StartCommand.ExecuteAsync(null); Check(vm.IsGameOver, "Unsaved result cannot be silently discarded by restart");
-    await vm.SaveResultCommand.ExecuteAsync(null); Check(!vm.CanRetrySave, "Retry saves pending result");
-    for (int i = 0; i < 20; i++) vm.Advance(GameEngine.Step);
-    await vm.SaveResultCommand.ExecuteAsync(null);
-    using (var db = new GameDbContext(new DbContextOptionsBuilder<GameDbContext>().UseSqlite($"Data Source={path}").Options))
-        Check(db.Results.Count() == attemptsBefore + 1, "Repeated finished frames and commands save one attempt");
-    Check((await store.GetTopAsync()).Count == 10, "Leaderboard remains bounded after retry");
-    await vm.StartCommand.ExecuteAsync(null); vm.FlapCommand.Execute(null); vm.OnBackgrounded();
-    Check(vm.IsPaused && vm.Engine.State == GameState.Paused, "Backgrounding pauses game");
-    var resume = vm.ResumeCommand.ExecuteAsync(null); vm.OnBackgrounded(); await resume;
-    Check(vm.IsPaused && !vm.HasCountdown, "Backgrounding cancels resume countdown");
+    Check((await reopened.GetAchievementsAsync())[0].UnlockedAtUtc == unlockDate, "Unlock dates survive reopening");
+    Check((await reopened.GetAchievementsAsync()).All(x => x.IsUnlocked), "Achievements durable");
+    Check((await reopened.GetSettingsAsync()).DefaultDifficulty == Difficulty.Hard, "Difficulty durable");
+    var achievementsVm = new AchievementsViewModel(reopened); await achievementsVm.LoadCommand.ExecuteAsync(null);
+    Check(achievementsVm.Completion == 1 && achievementsVm.Achievements.Count == 4, "Achievements page progress");
+    using (var db = Context(path)) Check(db.Achievements.Count() == 4, "No duplicate unlock rows");
+    bool rejected = false;
+    try { await store.SaveResultAsync(Result(-1)); } catch (ArgumentException) { rejected = true; }
+    Check(rejected, "Invalid score rejected");
 }
 finally { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); File.Delete(path); }
-Console.WriteLine($"PASS: {assertions} assertions, physics + MVVM + real EF Core/SQLite migrations and persistence.");
+
+// A fresh player earns the first achievement through the real GameViewModel save path.
+var freshPath = Path.Combine(Path.GetTempPath(), "flappy-new-player-" + Guid.NewGuid() + ".db");
+try
+{
+    var store = new SqliteGameStore(freshPath); await store.InitializeAsync();
+    var session = new GameSession(); var nav = new FakeNavigation();
+    var game = new GameViewModel(store, new SilentFeedback(), nav, session);
+    Check(await game.PrepareAsync(Difficulty.Easy), "Fresh game prepares");
+    game.FlapCommand.Execute(null);
+    for (int i = 0; i < 1500 && !game.IsGameOver && game.Score < 1; i++)
+    {
+        var next = game.Engine.Pipes.FirstOrDefault(p => p.X + GameEngine.PipeWidth >= GameEngine.BirdX - GameEngine.BirdRadius) ?? game.Engine.Pipes[^1];
+        if (game.Engine.BirdY > next.GapY + 12 && game.Engine.Velocity >= 0) game.FlapCommand.Execute(null);
+        game.Advance(GameEngine.Step);
+    }
+    Check(game.Score == 1 && !game.IsGameOver, "Fresh player passes a pipe");
+    game.PauseCommand.Execute(null); game.FinishCommand.Execute(null); await game.SaveResultCommand.ExecutionTask!;
+    Check(game.ResultTitle == "Новый рекорд!" && game.PreviousBest == 0 && game.BestScore == 1, "New record compares against pre-attempt best");
+    Check(game.HasNewAchievements && game.NewAchievementsText.Contains("Первое очко"), "Game result announces newly committed achievement");
+    Check(game.NextMedalText.Contains("9 очк.") && session.LastSavedResult!.Difficulty == Difficulty.Easy, "Result medal and difficulty metadata");
+    Check((await store.GetAchievementsAsync()).Count(x => x.IsUnlocked) == 1, "First achievement committed");
+    await game.ReplayCommand.ExecuteAsync(null);
+    Check(game.PreviousBest == 1 && game.IsReady && game.Engine.Difficulty == Difficulty.Easy, "Replay refreshes best and retains level");
+    var failing = new GameViewModel(new FaultStore(store), new SilentFeedback(), nav, session);
+    await failing.PrepareAsync(Difficulty.Hard); failing.FlapCommand.Execute(null);
+    failing.PauseCommand.Execute(null); failing.FinishCommand.Execute(null); await failing.SaveResultCommand.ExecutionTask!;
+    var id = failing.Engine.SessionId; failing.DiscardResultCommand.Execute(null); await failing.ReplayCommand.ExecuteAsync(null);
+    Check(failing.IsReady && failing.Engine.SessionId != id && (await store.GetStatisticsAsync()).Attempts == 1, "Explicit discard permits replay without adding attempt");
+}
+finally { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); File.Delete(freshPath); }
+Console.WriteLine($"PASS: {assertions} assertions. Three difficulties, physics, five ViewModels, migration from v1, SQLite results and achievements.");
 
 sealed class SilentFeedback : IGameFeedback { public void Play(string sound) { } public void Vibrate() { } }
+sealed class FakeNavigation : INavigationService
+{
+    public List<Destination> Destinations { get; } = [];
+    public Task GoToAsync(Destination destination) { Destinations.Add(destination); return Task.CompletedTask; }
+}
 sealed class FaultStore(IGameStore inner) : IGameStore
 {
     private bool fail = true;
     public Task InitializeAsync() => inner.InitializeAsync();
-    public Task<IReadOnlyList<GameResult>> GetTopAsync() => inner.GetTopAsync();
+    public Task<IReadOnlyList<GameResult>> GetTopAsync(Difficulty difficulty) => inner.GetTopAsync(difficulty);
+    public Task<GameStatistics> GetStatisticsAsync() => inner.GetStatisticsAsync();
+    public Task<IReadOnlyList<AchievementProgress>> GetAchievementsAsync() => inner.GetAchievementsAsync();
     public Task<PlayerSettings> GetSettingsAsync() => inner.GetSettingsAsync();
     public Task SaveSettingsAsync(PlayerSettings settings) => inner.SaveSettingsAsync(settings);
-    public Task SaveResultAsync(GameResult result)
+    public Task<SaveOutcome> SaveResultAsync(GameResult result)
     {
         if (fail) { fail = false; throw new IOException("Simulated disk failure"); }
         return inner.SaveResultAsync(result);

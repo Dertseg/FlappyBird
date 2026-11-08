@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:FlappyBird.ViewModels" xmlns:models="clr-namespace:FlappyBird.Models"
+    xmlns:controls="clr-namespace:FlappyBird.Views.Controls"
+    x:Class="FlappyBird.Views.GamePage" x:DataType="vm:GameViewModel" Shell.NavBarIsVisible="False" Shell.TabBarIsVisible="False">
+
+  <Grid RowDefinitions="Auto,*,Auto" BackgroundColor="#F3F6FC">
+    <Grid Padding="18,10" ColumnDefinitions="*,Auto" ColumnSpacing="12" IsVisible="{Binding ShowGameHeader}">
+      <VerticalStackLayout><Label Text="{Binding DifficultyName}" Style="{StaticResource Eyebrow}" /><Label Text="{Binding Score, StringFormat='Счёт: {0}'}" FontSize="24" FontAttributes="Bold" /></VerticalStackLayout>
+      <Button Grid.Column="1" Text="Ⅱ" IsVisible="{Binding IsPlaying}" Command="{Binding PauseCommand}" Style="{StaticResource SecondaryButton}" WidthRequest="52" SemanticProperties.Description="Поставить игру на паузу" />
+      <Button Grid.Column="1" Text="×" IsVisible="{Binding IsReady}" Command="{Binding HomeCommand}" Style="{StaticResource SecondaryButton}" WidthRequest="52" SemanticProperties.Description="Вернуться на главную" />
+    </Grid>
+    <Grid Grid.Row="1">
+      <GraphicsView x:Name="GameCanvas" StartInteraction="OnTouch" SemanticProperties.Description="Игровое поле. Касание — взмах." />
+      <Border IsVisible="{Binding IsReady}" InputTransparent="True" BackgroundColor="#F5FFFFFF" StrokeThickness="0" StrokeShape="RoundRectangle 24" Padding="24" Margin="24" HorizontalOptions="Center" VerticalOptions="Center">
+        <VerticalStackLayout Spacing="10"><Label Text="Лови поток" FontSize="28" FontAttributes="Bold" HorizontalTextAlignment="Center" /><Label Text="Коснись поля, чтобы взлететь.&#10;Пролети между трубами — получи очко." Style="{StaticResource Subtitle}" HorizontalTextAlignment="Center" /></VerticalStackLayout>
+      </Border>
+      <Grid IsVisible="{Binding IsPaused}" BackgroundColor="#DB152C45">
+        <ScrollView VerticalOptions="Center"><VerticalStackLayout Padding="28" Spacing="18" MaximumWidthRequest="500">
+          <Label Text="МИНУТА ДЛЯ СЕБЯ" FontSize="11" CharacterSpacing="2" TextColor="#86D9CA" HorizontalTextAlignment="Center" /><Label Text="Пауза" TextColor="White" FontSize="36" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+          <Label Text="{Binding CountdownText}" TextColor="#F6CE7A" FontSize="64" IsVisible="{Binding HasCountdown}" HorizontalTextAlignment="Center" />
+          <Label Text="Продолжим с того же места" FontSize="14" TextColor="#C3D3E3" HorizontalTextAlignment="Center" />
+          <Button Text="Продолжить полёт" Command="{Binding ResumeCommand}" />
+          <Button Text="Завершить и сохранить попытку" Command="{Binding FinishCommand}" Style="{StaticResource SecondaryButton}" FontSize="14" />
+        </VerticalStackLayout></ScrollView>
+      </Grid>
+      <Grid IsVisible="{Binding IsGameOver}" BackgroundColor="{StaticResource Canvas}">
+        <ScrollView><VerticalStackLayout Padding="20,8,20,24" Spacing="14" MaximumWidthRequest="600">
+          <Label Text="{Binding ResultTitle}" FontSize="25" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+          <Border BackgroundColor="#152C45" StrokeThickness="0" StrokeShape="RoundRectangle 26" Padding="18">
+            <VerticalStackLayout Spacing="2"><Label Text="ТВОЙ РЕЗУЛЬТАТ" TextColor="#86D9CA" FontSize="10" CharacterSpacing="2" HorizontalTextAlignment="Center" /><Label Text="{Binding Score}" FontSize="68" FontAttributes="Bold" TextColor="White" HorizontalTextAlignment="Center" /><Label Text="{Binding DifficultyName}" TextColor="#C3D3E3" FontSize="13" HorizontalTextAlignment="Center" /></VerticalStackLayout>
+          </Border>
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+            <Border Style="{StaticResource Card}" Padding="14"><VerticalStackLayout Spacing="4"><Label Text="ВРЕМЯ ПОЛЁТА" Style="{StaticResource Eyebrow}" FontSize="9" /><Label Text="{Binding DurationText}" FontSize="27" FontAttributes="Bold" /><Label Text="минуты : секунды" Style="{StaticResource Subtitle}" FontSize="10" /></VerticalStackLayout></Border>
+            <Border Grid.Column="1" Style="{StaticResource Card}" Padding="14"><VerticalStackLayout Spacing="4"><Label Text="ПРЕЖНИЙ РЕКОРД" Style="{StaticResource Eyebrow}" FontSize="9" /><Label Text="{Binding PreviousBest}" FontSize="27" FontAttributes="Bold" /><Label Text="до этой попытки" Style="{StaticResource Subtitle}" FontSize="10" /></VerticalStackLayout></Border>
+          </Grid>
+          <Border Style="{StaticResource Card}" BackgroundColor="#FFFAEC"><VerticalStackLayout Spacing="10"><Label Text="{Binding MedalText}" FontSize="19" FontAttributes="Bold" /><ProgressBar Progress="{Binding MedalFraction}" ProgressColor="#C49437" BackgroundColor="#F0E4C7" /><Label Text="{Binding NextMedalText}" FontSize="13" TextColor="#79612F" /><Label Text="{Binding BestScore, StringFormat='Лучший счёт уровня: {0}'}" Style="{StaticResource Subtitle}" FontSize="12" /></VerticalStackLayout></Border>
+          <Border IsVisible="{Binding HasNewAchievements}" BackgroundColor="#E2F3EE" StrokeThickness="0" StrokeShape="RoundRectangle 20" Padding="18"><VerticalStackLayout Spacing="6"><Label Text="НОВОЕ ДОСТИЖЕНИЕ" Style="{StaticResource Eyebrow}" /><Label Text="{Binding NewAchievementsText}" FontSize="18" FontAttributes="Bold" /><Button Text="Открыть коллекцию →" Command="{Binding AchievementsCommand}" Style="{StaticResource GhostButton}" IsEnabled="{Binding CanInteract}" /></VerticalStackLayout></Border>
+          <VerticalStackLayout Spacing="10" IsEnabled="{Binding CanInteract}">
+            <Button Text="Ещё один полёт  →" Command="{Binding ReplayCommand}" />
+            <Button Text="Посмотреть рекорды" Command="{Binding LeaderboardCommand}" Style="{StaticResource SecondaryButton}" />
+            <Button Text="Повторить сохранение" Command="{Binding SaveResultCommand}" IsVisible="{Binding CanRetrySave}" />
+            <Button Text="Не сохранять эту попытку" Command="{Binding DiscardResultCommand}" IsVisible="{Binding CanRetrySave}" Style="{StaticResource GhostButton}" TextColor="#B44B4B" />
+            <Button Text="На главную" Command="{Binding HomeCommand}" Style="{StaticResource GhostButton}" />
+          </VerticalStackLayout>
+        </VerticalStackLayout></ScrollView>
+      </Grid>
+    </Grid>
+    <controls:StatusBanner Grid.Row="2" Margin="16,6,16,10" />
+  </Grid>
+
+</ContentPage>

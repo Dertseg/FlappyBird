@@ -7,5 +7,6 @@ public sealed class GameResult
     public int Score { get; set; }
     public DateTime PlayedAtUtc { get; set; }
     public double DurationSeconds { get; set; }
+    public Difficulty Difficulty { get; set; } = Difficulty.Normal;
     public string Mode { get; set; } = "Classic";
 }

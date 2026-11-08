@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:FlappyBird.ViewModels" xmlns:models="clr-namespace:FlappyBird.Models"
+    xmlns:controls="clr-namespace:FlappyBird.Views.Controls"
+    x:Class="FlappyBird.Views.AchievementsPage" x:DataType="vm:AchievementsViewModel" Shell.NavBarIsVisible="False" >
+
+  <ScrollView><VerticalStackLayout Padding="22,20,22,28" Spacing="18" MaximumWidthRequest="600">
+    <VerticalStackLayout Spacing="5"><Label Text="ТВОЯ КОЛЛЕКЦИЯ" Style="{StaticResource Eyebrow}" /><Label Text="Достижения" Style="{StaticResource PageTitle}" /><Label Text="Большие рекорды начинаются с маленьких побед." Style="{StaticResource Subtitle}" /></VerticalStackLayout>
+    <Border BackgroundColor="#152C45" StrokeThickness="0" StrokeShape="RoundRectangle 24" Padding="22"><VerticalStackLayout Spacing="14"><Label Text="{Binding Summary}" FontSize="25" FontAttributes="Bold" TextColor="White" /><ProgressBar Progress="{Binding Completion}" ProgressColor="#75D6BF" BackgroundColor="#35506A" /><Label Text="Прогресс общий для всех уровней сложности" FontSize="12" TextColor="#C3D3E3" /></VerticalStackLayout></Border>
+    <VerticalStackLayout Spacing="12" BindableLayout.ItemsSource="{Binding Achievements}">
+      <BindableLayout.ItemTemplate><DataTemplate x:DataType="models:AchievementProgress">
+        <Border Style="{StaticResource Card}">
+          <Border.Triggers><DataTrigger TargetType="Border" Binding="{Binding IsUnlocked}" Value="True"><Setter Property="Stroke" Value="#D5B56C" /><Setter Property="BackgroundColor" Value="#FFFCF4" /></DataTrigger></Border.Triggers>
+          <VerticalStackLayout Spacing="14">
+            <Grid ColumnDefinitions="54,*" ColumnSpacing="14">
+              <Border BackgroundColor="#E8EDF5" StrokeThickness="0" StrokeShape="RoundRectangle 17" HeightRequest="54" VerticalOptions="Start"><Border.Triggers><DataTrigger TargetType="Border" Binding="{Binding IsUnlocked}" Value="True"><Setter Property="BackgroundColor" Value="#F8E5B9" /></DataTrigger></Border.Triggers><Label Text="{Binding Symbol}" FontAttributes="Bold" FontSize="21" HorizontalTextAlignment="Center" VerticalTextAlignment="Center" /></Border>
+              <VerticalStackLayout Grid.Column="1" Spacing="5"><Label Text="{Binding Title}" FontAttributes="Bold" FontSize="20" /><Label Text="{Binding Description}" Style="{StaticResource Subtitle}" FontSize="13" /></VerticalStackLayout>
+            </Grid>
+            <ProgressBar Progress="{Binding Progress}" />
+            <Grid ColumnDefinitions="*,Auto"><Label Text="{Binding StateText}" FontSize="11" TextColor="{StaticResource Muted}" /><Label Grid.Column="1" Text="{Binding ProgressText}" FontSize="12" FontAttributes="Bold" /></Grid>
+          </VerticalStackLayout>
+        </Border>
+      </DataTemplate></BindableLayout.ItemTemplate>
+    </VerticalStackLayout>
+    <Label Text="Полученные награды сохраняются на этом устройстве. Старые полёты тоже учитываются." Style="{StaticResource Subtitle}" FontSize="12" />
+    <controls:StatusBanner /><Button Text="Обновить достижения" Command="{Binding LoadCommand}" Style="{StaticResource SecondaryButton}" />
+  </VerticalStackLayout></ScrollView>
+
+</ContentPage>

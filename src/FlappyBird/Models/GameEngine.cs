@@ -25,10 +25,15 @@ public sealed class GameEngine
     public int Score { get; private set; }
     public double Elapsed { get; private set; }
     public Guid SessionId { get; private set; }
+    public Difficulty Difficulty { get; private set; }
+    public double PipeSpeed => DifficultyCatalog.Get(Difficulty).Speed;
+    public double GapSize => DifficultyCatalog.Get(Difficulty).Gap;
     public IReadOnlyList<Pipe> Pipes => pipes;
 
-    public void Reset()
+    public void Reset(Difficulty difficulty = Difficulty.Normal)
     {
+        _ = DifficultyCatalog.Get(difficulty);
+        Difficulty = difficulty;
         SessionId = Guid.NewGuid(); State = GameState.Ready;
         BirdY = 280; Velocity = 0; Score = 0; Elapsed = 0; accumulator = 0;
         pipes.Clear();
@@ -42,6 +47,7 @@ public sealed class GameEngine
     }
     public void Pause() { if (State == GameState.Playing) { State = GameState.Paused; accumulator = 0; } }
     public void Resume() { if (State == GameState.Paused) State = GameState.Playing; }
+    public void Finish() { if (State is GameState.Playing or GameState.Paused) State = GameState.GameOver; }
     public void Advance(double seconds)
     {
         if (State != GameState.Playing || !double.IsFinite(seconds) || seconds <= 0) return;
@@ -55,7 +61,7 @@ public sealed class GameEngine
     private void Tick()
     {
         Elapsed += Step; Velocity += Gravity * Step; BirdY += Velocity * Step;
-        foreach (var pipe in pipes) pipe.X -= Speed * Step;
+        foreach (var pipe in pipes) pipe.X -= PipeSpeed * Step;
         if (BirdY - BirdRadius <= 0 || BirdY + BirdRadius >= GroundY || pipes.Any(Hits))
         {
             State = GameState.GameOver; return;
@@ -73,8 +79,8 @@ public sealed class GameEngine
     private bool Hits(Pipe p)
     {
         // Circle against two rectangles: corners stay fair, unlike a bounding box collision.
-        return CircleRect(p.X, 0, PipeWidth, p.GapY - Gap / 2)
-            || CircleRect(p.X, p.GapY + Gap / 2, PipeWidth, GroundY - p.GapY - Gap / 2);
+        return CircleRect(p.X, 0, PipeWidth, p.GapY - GapSize / 2)
+            || CircleRect(p.X, p.GapY + GapSize / 2, PipeWidth, GroundY - p.GapY - GapSize / 2);
     }
     private bool CircleRect(double x, double y, double w, double h)
     {

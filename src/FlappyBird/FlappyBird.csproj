@@ -7,8 +7,8 @@
     <SingleProject>true</SingleProject>
     <ApplicationTitle>FlappyBird</ApplicationTitle>
     <ApplicationId>com.dertseg.flappybird</ApplicationId>
-    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>2.0</ApplicationDisplayVersion>
+    <ApplicationVersion>2</ApplicationVersion>
     <SupportedOSPlatformVersion>23.0</SupportedOSPlatformVersion>
     <AndroidPackageFormats>apk</AndroidPackageFormats>
     <!-- Preserve EF Core reflection in Release; optimize trimming separately. -->
@@ -19,6 +19,7 @@
   <ItemGroup>
     <MauiIcon Include="Resources/AppIcon/appicon.svg" ForegroundFile="Resources/AppIcon/appiconfg.svg" Color="#102A43" />
     <MauiSplashScreen Include="Resources/Splash/splash.svg" Color="#102A43" BaseSize="128,128" />
+    <MauiImage Include="Resources/Images/*.svg" />
     <MauiAsset Include="Resources/Raw/**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
     <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.120" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
@@ -30,7 +31,6 @@
     <Folder Include="Converters/" />
     <Folder Include="Messages/" />
     <Folder Include="Properties/" />
-    <Compile Update="Views/MainPage.xaml.cs"><DependentUpon>MainPage.xaml</DependentUpon></Compile>
     <Compile Update="AppShell.xaml.cs"><DependentUpon>AppShell.xaml</DependentUpon></Compile>
   </ItemGroup>
 </Project>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:FlappyBird.ViewModels" xmlns:models="clr-namespace:FlappyBird.Models"
+    xmlns:controls="clr-namespace:FlappyBird.Views.Controls"
+    x:Class="FlappyBird.Views.SettingsPage" x:DataType="vm:SettingsViewModel" Shell.NavBarIsVisible="False" >
+
+  <ScrollView><VerticalStackLayout Padding="22,20,22,28" Spacing="18" MaximumWidthRequest="600">
+    <VerticalStackLayout Spacing="5"><Label Text="ТВОЙ СТИЛЬ ПОЛЁТА" Style="{StaticResource Eyebrow}" /><Label Text="Настройки" Style="{StaticResource PageTitle}" /><Label Text="Сделай игру удобной для себя." Style="{StaticResource Subtitle}" /></VerticalStackLayout>
+    <VerticalStackLayout Spacing="18" IsEnabled="{Binding CanInteract}">
+      <Border Style="{StaticResource Card}"><VerticalStackLayout Spacing="10"><Label Text="Как тебя записать?" FontSize="18" FontAttributes="Bold" /><Label Text="Имя появится в новых результатах. До 20 символов." Style="{StaticResource Subtitle}" FontSize="12" /><Entry Text="{Binding PlayerName}" MaxLength="20" Placeholder="Игрок" ReturnType="Done" SemanticProperties.Description="Имя игрока" /></VerticalStackLayout></Border>
+      <Border Style="{StaticResource Card}"><VerticalStackLayout Spacing="18"><Label Text="Звук и ощущения" FontSize="18" FontAttributes="Bold" />
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><VerticalStackLayout VerticalOptions="Center"><Label Text="Звуковые эффекты" FontAttributes="Bold" /><Label Text="Взмах, очко и столкновение" Style="{StaticResource Subtitle}" FontSize="11" /></VerticalStackLayout><Switch Grid.Column="1" IsToggled="{Binding SoundEnabled}" SemanticProperties.Description="Звуковые эффекты" /></Grid>
+        <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><VerticalStackLayout VerticalOptions="Center"><Label Text="Вибрация" FontAttributes="Bold" /><Label Text="Отклик при завершении полёта" Style="{StaticResource Subtitle}" FontSize="11" /></VerticalStackLayout><Switch Grid.Column="1" IsToggled="{Binding VibrationEnabled}" SemanticProperties.Description="Вибрация" /></Grid>
+      </VerticalStackLayout></Border>
+      <Border Style="{StaticResource Card}"><VerticalStackLayout Spacing="10"><Label Text="Уровень по умолчанию" FontSize="18" FontAttributes="Bold" /><Picker Title="Выбери уровень" ItemsSource="{Binding Difficulties}" SelectedItem="{Binding SelectedDifficulty}" ItemDisplayBinding="{Binding Name, x:DataType=models:DifficultyOption}" /><Label Text="Его можно изменить и на главном экране. Рекорды разных уровней не смешиваются." Style="{StaticResource Subtitle}" FontSize="12" /></VerticalStackLayout></Border>
+      <Button Text="Сохранить настройки" Command="{Binding SaveCommand}" />
+    </VerticalStackLayout>
+    <controls:StatusBanner /><Button Text="Обновить настройки" Command="{Binding LoadCommand}" Style="{StaticResource GhostButton}" />
+    <Label Text="FLAPPY / CLUB · 2.0&#10;Результаты и достижения хранятся локально в SQLite." Style="{StaticResource Subtitle}" FontSize="11" HorizontalTextAlignment="Center" />
+  </VerticalStackLayout></ScrollView>
+
+</ContentPage>
