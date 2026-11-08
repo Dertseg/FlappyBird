@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" x:Class="FlappyBird.App">
+  <Application.Resources>
+    <Style TargetType="ContentPage"><Setter Property="BackgroundColor" Value="#F2F7F8" /></Style>
+    <Style TargetType="Label"><Setter Property="TextColor" Value="#102A43" /><Setter Property="FontSize" Value="16" /></Style>
+    <Style TargetType="Button">
+      <Setter Property="BackgroundColor" Value="#116466" /><Setter Property="TextColor" Value="White" />
+      <Setter Property="CornerRadius" Value="18" /><Setter Property="MinimumHeightRequest" Value="50" />
+      <Setter Property="FontSize" Value="17" /><Setter Property="FontAttributes" Value="Bold" />
+    </Style>
+    <Style TargetType="Entry"><Setter Property="TextColor" Value="#102A43" /><Setter Property="PlaceholderColor" Value="#526777" /></Style>
+  </Application.Resources>
+</Application>

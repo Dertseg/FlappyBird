@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0-android</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>FlappyBird</RootNamespace>
+    <UseMaui>true</UseMaui>
+    <SingleProject>true</SingleProject>
+    <ApplicationTitle>FlappyBird</ApplicationTitle>
+    <ApplicationId>com.dertseg.flappybird</ApplicationId>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+    <SupportedOSPlatformVersion>23.0</SupportedOSPlatformVersion>
+    <AndroidPackageFormats>apk</AndroidPackageFormats>
+    <!-- Preserve EF Core reflection in Release; optimize trimming separately. -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <RunAOTCompilation>false</RunAOTCompilation>
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+  </PropertyGroup>
+  <ItemGroup>
+    <MauiIcon Include="Resources/AppIcon/appicon.svg" ForegroundFile="Resources/AppIcon/appiconfg.svg" Color="#102A43" />
+    <MauiSplashScreen Include="Resources/Splash/splash.svg" Color="#102A43" BaseSize="128,128" />
+    <MauiAsset Include="Resources/Raw/**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.120" />
+    <ProjectReference Include="../FlappyBird.Core/FlappyBird.Core.csproj" />
+    <ProjectReference Include="../FlappyBird.Data/FlappyBird.Data.csproj" />
+  </ItemGroup>
+</Project>
