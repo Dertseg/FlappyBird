@@ -1,4 +1,6 @@
-using FlappyBird.Core;
+using FlappyBird.Models;
+using FlappyBird.ViewModels;
+using FlappyBird.Services;
 using FlappyBird.Data;
 using Microsoft.EntityFrameworkCore;
 

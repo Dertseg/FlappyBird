@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:core="clr-namespace:FlappyBird.Core;assembly=FlappyBird.Core"
-             x:Class="FlappyBird.MainPage" x:DataType="core:MainViewModel" Title="FlappyBird">
+             xmlns:vm="clr-namespace:FlappyBird.ViewModels"
+             xmlns:models="clr-namespace:FlappyBird.Models"
+             x:Class="FlappyBird.Views.MainPage" x:DataType="vm:MainViewModel" Title="FlappyBird">
   <Grid Padding="12" RowDefinitions="*,Auto,Auto">
     <ScrollView IsVisible="{Binding IsMenu}">
       <VerticalStackLayout Padding="16,28" Spacing="16" VerticalOptions="Center">
@@ -55,7 +56,7 @@
       <VerticalStackLayout><Label Text="Лучшие полёты" FontSize="30" FontAttributes="Bold" /><Label Text="10 лучших попыток на этом устройстве" FontSize="14" /></VerticalStackLayout>
       <CollectionView Grid.Row="1" ItemsSource="{Binding Leaders}" SelectionMode="None">
         <CollectionView.ItemTemplate>
-          <DataTemplate x:DataType="core:ScoreRow">
+          <DataTemplate x:DataType="models:ScoreRow">
             <Border Margin="0,4" Padding="12" StrokeThickness="0" BackgroundColor="#DCEFEA" StrokeShape="RoundRectangle 14">
               <Grid ColumnDefinitions="36,*,60" RowDefinitions="Auto,Auto">
                 <Label Text="{Binding Place}" FontSize="22" Grid.RowSpan="2" />

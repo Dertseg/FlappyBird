@@ -1,10 +1,12 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
-namespace FlappyBird.Core;
+using FlappyBird.Models;
+using FlappyBird.Data;
+using FlappyBird.Services;
 
-public enum Screen { Menu, Game, Leaderboard, Settings }
-public sealed record ScoreRow(int Place, string Player, int Score, string Date);
+namespace FlappyBird.ViewModels;
+
 
 public partial class MainViewModel : ObservableObject
 {

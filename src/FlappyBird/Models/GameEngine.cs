@@ -1,4 +1,4 @@
-namespace FlappyBird.Core;
+namespace FlappyBird.Models;
 
 public enum GameState { Ready, Playing, Paused, GameOver }
 

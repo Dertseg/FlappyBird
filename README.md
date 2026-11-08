@@ -17,7 +17,7 @@
 1. Установите **Visual Studio 2022 17.14** с рабочей нагрузкой **«Разработка с помощью .NET Multi-platform App UI»**. В Visual Studio Installer проверьте наличие .NET 9 SDK, Android SDK Platform 35, Android Build Tools и Microsoft OpenJDK 17. Android-эмулятор необязателен при наличии телефона.
 2. Клонируйте `https://github.com/Dertseg/FlappyBird.git` через меню **Git → Клонировать репозиторий** в папку с латинским путём, например **C:\Projects\FlappyBird**. Переключитесь на ветку **feature/android-mvvm-sqlite**. В установленном Android-инструментарии обнаружена ошибка AAPT2000 при упаковке в папке с кириллицей; латинский путь позволяет её избежать.
 3. Откройте **FlappyBird.sln**. Дождитесь восстановления NuGet-пакетов.
-4. В обозревателе решений нажмите правой кнопкой на **FlappyBird** → **Назначить запускаемым проектом**. Не выбирайте Core, Data или Checks.
+4. В обозревателе решений нажмите правой кнопкой на **FlappyBird** → **Назначить запускаемым проектом**. В решении оставлен один проект приложения.
 5. На Android-телефоне включите режим разработчика и **отладку по USB**, подключите кабель с передачей данных и подтвердите доверие этому компьютеру.
 6. Выберите телефон в списке устройств на панели Visual Studio. Выберите **Debug**, нажмите **F5**.
 7. Для проверки сборки выпуска переключитесь на **Release**, соберите решение и запустите на том же телефоне.
@@ -39,12 +39,22 @@ APK создаётся внутри `src/FlappyBird/bin/Release/net9.0-android/`
 
 ## Где SQLite и MVVM
 
-| Проект | Ответственность |
+Решение содержит один мобильный проект **FlappyBird**, организованный по папкам:
+
+| Папка | Ответственность |
 |---|---|
-| FlappyBird.Core | GameEngine, модели, интерфейсы хранилища/эффектов и MainViewModel с командами CommunityToolkit.Mvvm |
-| FlappyBird.Data | GameDbContext, SqliteGameStore, миграции EF Core и фабрика для средств разработки |
-| FlappyBird | XAML-интерфейс, отрисовка, ввод, Android-звуки и жизненный цикл |
-| FlappyBird.Checks | Автоматические проверки физики, ViewModel и настоящей SQLite |
+| Models | GameResult, PlayerSettings, ScoreRow, Screen и GameEngine |
+| ViewModels | MainViewModel: состояние, команды и сохранение через IGameStore |
+| Views | MainPage.xaml и code-behind; Drawing/GameRenderer рисует игровое поле |
+| Data | IGameStore, GameDbContext, SqliteGameStore и миграции EF Core |
+| Services | IGameFeedback и AndroidFeedback: звук и вибрация |
+| Behaviors, Converters, Messages | Зарезервированные папки по образцу PhoneWord; пока не используются |
+| Platforms, Resources, Properties | Платформенные файлы, ресурсы и свойства проекта |
+
+В корне проекта находятся App.xaml, AppShell.xaml, GlobalXmlns.cs и MauiProgram.cs.
+AppShell содержит игровую страницу; обработка кнопки «Назад» и паузы сохранена.
+GlobalXmlns.cs содержит общие using-директивы приложения.
+Проверки находятся в tests/FlappyBird.Checks, запускаются отдельно и используют исходные файлы Models, ViewModels и Data без их копирования. В основное решение они не включены, чтобы в обозревателе решений был один проект.
 
 Code-behind передаёт касания, время кадра и события жизненного цикла; физики и SQL в нём нет. ViewModel управляет состоянием экранов и сохранением через интерфейс. Физика не зависит от MAUI. SQLite-операции выполняются последовательно вне UI-потока, с отдельным DbContext для каждой операции.
 
@@ -54,7 +64,7 @@ Code-behind передаёт касания, время кадра и событ
 
 ```powershell
 dotnet tool restore
-dotnet ef migrations add NameOfChange --project src/FlappyBird.Data --output-dir Migrations
+dotnet ef migrations add NameOfChange --project tests/FlappyBird.Checks --output-dir ../../src/FlappyBird/Data/Migrations --namespace FlappyBird.Data.Migrations
 dotnet run --project tests/FlappyBird.Checks -c Release
 ```
 

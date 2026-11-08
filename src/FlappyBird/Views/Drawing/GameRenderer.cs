@@ -1,5 +1,5 @@
-using FlappyBird.Core;
-namespace FlappyBird.Drawing;
+using FlappyBird.Models;
+namespace FlappyBird.Views.Drawing;
 public sealed class GameRenderer(GameEngine game) : IDrawable
 {
     public void Draw(ICanvas c, RectF bounds)

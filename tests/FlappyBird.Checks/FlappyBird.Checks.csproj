@@ -1,4 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net9.0</TargetFramework></PropertyGroup>
-  <ItemGroup><ProjectReference Include="../../src/FlappyBird.Data/FlappyBird.Data.csproj" /></ItemGroup>
+  <ItemGroup>
+    <!-- Compile the production MVVM and data files directly, without Android dependencies. -->
+    <Compile Include="../../src/FlappyBird/Models/**/*.cs" Link="Models/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../../src/FlappyBird/ViewModels/**/*.cs" Link="ViewModels/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../../src/FlappyBird/Data/**/*.cs" Link="Data/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../../src/FlappyBird/Services/IGameFeedback.cs" Link="Services/IGameFeedback.cs" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.10" PrivateAssets="all" />
+  </ItemGroup>
 </Project>

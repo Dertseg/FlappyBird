@@ -1,6 +1,3 @@
-using FlappyBird.Core;
-using FlappyBird.Data;
-using FlappyBird.Services;
 namespace FlappyBird;
 public static class MauiProgram
 {
@@ -11,6 +8,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IGameFeedback, AndroidFeedback>();
         builder.Services.AddSingleton<MainViewModel>();
         builder.Services.AddSingleton<MainPage>();
+        builder.Services.AddSingleton<AppShell>();
         return builder.Build();
     }
 }

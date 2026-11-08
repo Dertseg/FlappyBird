@@ -1,7 +1,7 @@
 using System.Diagnostics;
-using FlappyBird.Core;
-using FlappyBird.Drawing;
-namespace FlappyBird;
+using FlappyBird.ViewModels;
+using FlappyBird.Views.Drawing;
+namespace FlappyBird.Views;
 public partial class MainPage : ContentPage
 {
     private readonly MainViewModel vm;
@@ -23,7 +23,8 @@ public partial class MainPage : ContentPage
     private void OnTouch(object? sender, TouchEventArgs e) => vm.FlapCommand.Execute(null);
     public void Backgrounded() { vm.OnBackgrounded(); timer.Stop(); }
     public void Foregrounded() { previous = clock.Elapsed.TotalSeconds; timer.Start(); }
-    protected override bool OnBackButtonPressed()
+    protected override bool OnBackButtonPressed() => HandleBackButton();
+    public bool HandleBackButton()
     {
         if (vm.IsGame) { if (vm.IsGameOver || vm.IsPaused) vm.MenuCommand.Execute(null); else vm.PauseCommand.Execute(null); return true; }
         if (!vm.IsMenu) { vm.MenuCommand.Execute(null); return true; }

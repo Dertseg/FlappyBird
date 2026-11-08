@@ -1,4 +1,4 @@
-using FlappyBird.Core;
+using FlappyBird.Models;
 using Microsoft.EntityFrameworkCore;
 namespace FlappyBird.Data;
 /// <summary>SQLite operations run serially off the UI thread, each with its own context.</summary>

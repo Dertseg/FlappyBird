@@ -21,7 +21,16 @@
     <MauiSplashScreen Include="Resources/Splash/splash.svg" Color="#102A43" BaseSize="128,128" />
     <MauiAsset Include="Resources/Raw/**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
     <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.120" />
-    <ProjectReference Include="../FlappyBird.Core/FlappyBird.Core.csproj" />
-    <ProjectReference Include="../FlappyBird.Data/FlappyBird.Data.csproj" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.10" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Behaviors/" />
+    <Folder Include="Converters/" />
+    <Folder Include="Messages/" />
+    <Folder Include="Properties/" />
+    <Compile Update="Views/MainPage.xaml.cs"><DependentUpon>MainPage.xaml</DependentUpon></Compile>
+    <Compile Update="AppShell.xaml.cs"><DependentUpon>AppShell.xaml</DependentUpon></Compile>
   </ItemGroup>
 </Project>

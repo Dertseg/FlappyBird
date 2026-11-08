@@ -1,4 +1,4 @@
-using FlappyBird.Core;
+using FlappyBird.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 namespace FlappyBird.Data;
