@@ -7,7 +7,6 @@
     <Compile Include="../../src/FlappyBird/Data/**/*.cs" Link="Data/%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="../../src/FlappyBird/Services/IGameFeedback.cs" Link="Services/IGameFeedback.cs" />
     <Compile Include="../../src/FlappyBird/Services/INavigationService.cs" Link="Services/INavigationService.cs" />
-    <Compile Include="../../src/FlappyBird/Services/GameSession.cs" Link="Services/GameSession.cs" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.10" PrivateAssets="all" />

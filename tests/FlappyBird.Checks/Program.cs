@@ -76,16 +76,28 @@ try
     var top = await store.GetTopAsync(Difficulty.Hard);
     Check(top.Count == 10 && top[0].PlayerName == "Раньше", "Top ten deterministic tie ordering");
 
-    var session = new GameSession { LastSavedResult = earlier }; var nav = new FakeNavigation();
-    var records = new LeaderboardViewModel(store, session); await records.LoadCommand.ExecuteAsync(null);
-    Check(records.SelectedDifficulty == Difficulty.Hard && records.Leaders[0].IsLatest && records.Leaders[0].Badge == "🥇", "Latest attempt selects difficulty and gold row");
+    var nav = new FakeNavigation();
+    var latest = Result(14, Difficulty.Hard);
+    await store.SaveResultAsync(latest);
+    var recordsStore = new FaultStore(new SqliteGameStore(path));
+    var records = new LeaderboardViewModel(recordsStore);
+    await records.LoadCommand.ExecuteAsync(null);
+    Check(records.SelectedDifficulty == Difficulty.Hard && records.Leaders.Any(x => x.IsLatest) &&
+        records.Leaders[0].Badge == "🥇", "Latest attempt highlights after reopening SQLite");
+    var hardRows = records.Leaders;
+    var hardNote = records.LastRunNote;
+    recordsStore.FailTop = true;
+    await records.SelectDifficultyCommand.ExecuteAsync("Easy");
+    Check(records.SelectedDifficulty == Difficulty.Hard && ReferenceEquals(records.Leaders, hardRows) &&
+        records.LastRunNote == hardNote && records.HasStatus, "Failed filter preserves difficulty, rows and note");
+    recordsStore.FailTop = false;
     await records.SelectDifficultyCommand.ExecuteAsync("Easy");
     Check(records.Leaders.Single().Score == 60 && !records.Leaders[0].IsLatest, "Filter removes unrelated highlight");
-    var low = Result(0, Difficulty.Hard); await store.SaveResultAsync(low); session.LastSavedResult = low;
+    var low = Result(0, Difficulty.Hard); await store.SaveResultAsync(low);
     await records.LoadCommand.ExecuteAsync(null);
     Check(!records.Leaders.Any(x => x.IsLatest) && records.HasLastRunNote, "Non-top latest attempt still acknowledged");
 
-    var failing = new FaultStore(store); var game = new GameViewModel(failing, new SilentFeedback(), nav, session);
+    var failing = new FaultStore(store); var game = new GameViewModel(failing, new SilentFeedback(), nav);
     Check(await game.PrepareAsync(Difficulty.Normal), "Prepare game");
     Check(game.PreviousBest == 25, "Previous best captured before attempt");
     game.FlapCommand.Execute(null);
@@ -98,19 +110,38 @@ try
     var attemptsBefore = (await store.GetStatisticsAsync()).Attempts;
     await game.SaveResultCommand.ExecuteAsync(null); await game.SaveResultCommand.ExecuteAsync(null);
     Check(!game.CanRetrySave && (await store.GetStatisticsAsync()).Attempts == attemptsBefore + 1, "Retry records attempt once");
-    Check(game.PreviousBest == 25 && session.LastSavedResult!.Id == failedId, "Previous best stable after save");
+    Check(game.PreviousBest == 25 && (await store.GetLatestResultAsync())!.Id == failedId, "Previous best stable after save");
     await game.ReplayCommand.ExecuteAsync(null); game.FlapCommand.Execute(null); game.OnBackgrounded();
     Check(game.IsPaused, "Background pauses game");
     var resume = game.ResumeCommand.ExecuteAsync(null); game.OnBackgrounded(); await resume;
     Check(game.IsPaused && !game.HasCountdown, "Background cancels countdown");
     game.FinishCommand.Execute(null); await game.SaveResultCommand.ExecutionTask!;
     await game.HomeCommand.ExecuteAsync(null); Check(nav.Destinations.Last() == Destination.Home, "Saved game can navigate");
+    int attemptsBeforeExit = (await store.GetStatisticsAsync()).Attempts;
+    await game.ReplayCommand.ExecuteAsync(null);
+    game.FlapCommand.Execute(null);
+    game.HandleBack();
+    Check(game.IsPaused && !game.IsChoosingExit, "First Back pauses");
+    game.HandleBack();
+    Check(game.IsChoosingExit, "Second Back offers exit options");
+    game.HandleBack();
+    Check(game.IsPaused && !game.IsChoosingExit, "Back closes exit options");
+    game.ChooseExitCommand.Execute(null);
+    await game.ExitWithoutSavingCommand.ExecuteAsync(null);
+    Check(!game.IsChoosingExit && nav.Destinations.Last() == Destination.Home &&
+        (await store.GetStatisticsAsync()).Attempts == attemptsBeforeExit, "Discarding a paused flight leaves no result");
 
     var settingsVm = new SettingsViewModel(store); await settingsVm.LoadCommand.ExecuteAsync(null);
     settingsVm.PlayerName = "  Сокол  "; settingsVm.SelectedDifficulty = DifficultyCatalog.Get(Difficulty.Easy);
     await settingsVm.SaveCommand.ExecuteAsync(null);
     Check((await store.GetSettingsAsync()).PlayerName == "Сокол", "Settings trim and persist name");
     var home = new HomeViewModel(store, nav, game); await home.LoadCommand.ExecuteAsync(null);
+    nav.Fail = true;
+    await home.AchievementsCommand.ExecuteAsync(null);
+    Check(home.HasStatus && !home.IsBusy, "Home handles achievements navigation failure");
+    await home.LeaderboardCommand.ExecuteAsync(null);
+    Check(home.HasStatus && !home.IsBusy, "Home handles records navigation failure");
+    nav.Fail = false;
     Check(home.SelectedDifficulty == Difficulty.Easy && home.BestScore == 60, "Home loads chosen difficulty best");
     await home.SelectDifficultyCommand.ExecuteAsync("Hard");
     Check(home.BestScore == 14 && (await store.GetSettingsAsync()).DefaultDifficulty == Difficulty.Hard, "Home changes persist and refresh matching best");
@@ -138,8 +169,8 @@ var freshPath = Path.Combine(Path.GetTempPath(), "flappy-new-player-" + Guid.New
 try
 {
     var store = new SqliteGameStore(freshPath); await store.InitializeAsync();
-    var session = new GameSession(); var nav = new FakeNavigation();
-    var game = new GameViewModel(store, new SilentFeedback(), nav, session);
+    var nav = new FakeNavigation();
+    var game = new GameViewModel(store, new SilentFeedback(), nav);
     Check(await game.PrepareAsync(Difficulty.Easy), "Fresh game prepares");
     game.FlapCommand.Execute(null);
     for (int i = 0; i < 1500 && !game.IsGameOver && game.Score < 1; i++)
@@ -152,11 +183,11 @@ try
     game.PauseCommand.Execute(null); game.FinishCommand.Execute(null); await game.SaveResultCommand.ExecutionTask!;
     Check(game.ResultTitle == "Новый рекорд!" && game.PreviousBest == 0 && game.BestScore == 1, "New record compares against pre-attempt best");
     Check(game.HasNewAchievements && game.NewAchievementsText.Contains("Первое очко"), "Game result announces newly committed achievement");
-    Check(game.NextMedalText.Contains("9 очк.") && session.LastSavedResult!.Difficulty == Difficulty.Easy, "Result medal and difficulty metadata");
+    Check(game.NextMedalText.Contains("9 очк.") && (await store.GetLatestResultAsync())!.Difficulty == Difficulty.Easy, "Result medal and difficulty metadata");
     Check((await store.GetAchievementsAsync()).Count(x => x.IsUnlocked) == 1, "First achievement committed");
     await game.ReplayCommand.ExecuteAsync(null);
     Check(game.PreviousBest == 1 && game.IsReady && game.Engine.Difficulty == Difficulty.Easy, "Replay refreshes best and retains level");
-    var failing = new GameViewModel(new FaultStore(store), new SilentFeedback(), nav, session);
+    var failing = new GameViewModel(new FaultStore(store), new SilentFeedback(), nav);
     await failing.PrepareAsync(Difficulty.Hard); failing.FlapCommand.Execute(null);
     failing.PauseCommand.Execute(null); failing.FinishCommand.Execute(null); await failing.SaveResultCommand.ExecutionTask!;
     var id = failing.Engine.SessionId; failing.DiscardResultCommand.Execute(null); await failing.ReplayCommand.ExecuteAsync(null);
@@ -169,13 +200,24 @@ sealed class SilentFeedback : IGameFeedback { public void Play(string sound) { }
 sealed class FakeNavigation : INavigationService
 {
     public List<Destination> Destinations { get; } = [];
-    public Task GoToAsync(Destination destination) { Destinations.Add(destination); return Task.CompletedTask; }
+    public bool Fail { get; set; }
+    public Task GoToAsync(Destination destination)
+    {
+        if (Fail) throw new InvalidOperationException("Simulated navigation failure");
+        Destinations.Add(destination);
+        return Task.CompletedTask;
+    }
 }
 sealed class FaultStore(IGameStore inner) : IGameStore
 {
     private bool fail = true;
+    public bool FailTop { get; set; }
     public Task InitializeAsync() => inner.InitializeAsync();
-    public Task<IReadOnlyList<GameResult>> GetTopAsync(Difficulty difficulty) => inner.GetTopAsync(difficulty);
+    public Task<IReadOnlyList<GameResult>> GetTopAsync(Difficulty difficulty) =>
+        FailTop ? Task.FromException<IReadOnlyList<GameResult>>(new IOException("Simulated query failure")) : inner.GetTopAsync(difficulty);
+    public Task<GameResult?> GetLatestResultAsync() => inner.GetLatestResultAsync();
+    public Task<HomeSummary> GetHomeSummaryAsync() => inner.GetHomeSummaryAsync();
+    public Task<int> GetBestScoreAsync(Difficulty difficulty) => inner.GetBestScoreAsync(difficulty);
     public Task<GameStatistics> GetStatisticsAsync() => inner.GetStatisticsAsync();
     public Task<IReadOnlyList<AchievementProgress>> GetAchievementsAsync() => inner.GetAchievementsAsync();
     public Task<PlayerSettings> GetSettingsAsync() => inner.GetSettingsAsync();

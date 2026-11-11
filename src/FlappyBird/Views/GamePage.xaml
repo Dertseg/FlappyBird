@@ -20,8 +20,23 @@
           <Label Text="МИНУТА ДЛЯ СЕБЯ" FontSize="11" CharacterSpacing="2" TextColor="#86D9CA" HorizontalTextAlignment="Center" /><Label Text="Пауза" TextColor="White" FontSize="36" FontAttributes="Bold" HorizontalTextAlignment="Center" />
           <Label Text="{Binding CountdownText}" TextColor="#F6CE7A" FontSize="64" IsVisible="{Binding HasCountdown}" HorizontalTextAlignment="Center" />
           <Label Text="Продолжим с того же места" FontSize="14" TextColor="#C3D3E3" HorizontalTextAlignment="Center" />
-          <Button Text="Продолжить полёт" Command="{Binding ResumeCommand}" />
-          <Button Text="Завершить и сохранить попытку" Command="{Binding FinishCommand}" Style="{StaticResource SecondaryButton}" FontSize="14" />
+          <VerticalStackLayout Spacing="10" IsEnabled="{Binding CanInteract}">
+            <VerticalStackLayout Spacing="10">
+              <VerticalStackLayout.Triggers>
+                <DataTrigger TargetType="VerticalStackLayout" Binding="{Binding IsChoosingExit}" Value="True">
+                  <Setter Property="IsVisible" Value="False" />
+                </DataTrigger>
+              </VerticalStackLayout.Triggers>
+              <Button Text="Продолжить полёт" Command="{Binding ResumeCommand}" />
+              <Button Text="Завершить и сохранить попытку" Command="{Binding FinishCommand}" Style="{StaticResource SecondaryButton}" FontSize="14" />
+              <Button Text="Выйти из полёта" Command="{Binding ChooseExitCommand}" Style="{StaticResource SecondaryButton}" />
+            </VerticalStackLayout>
+            <VerticalStackLayout Spacing="10" IsVisible="{Binding IsChoosingExit}">
+              <Button Text="Завершить и сохранить попытку" Command="{Binding FinishCommand}" />
+              <Button Text="Выйти без сохранения" Command="{Binding ExitWithoutSavingCommand}" Style="{StaticResource SecondaryButton}" />
+              <Button Text="Остаться на паузе" Command="{Binding CancelExitCommand}" Style="{StaticResource SecondaryButton}" />
+            </VerticalStackLayout>
+          </VerticalStackLayout>
         </VerticalStackLayout></ScrollView>
       </Grid>
       <Grid IsVisible="{Binding IsGameOver}" BackgroundColor="{StaticResource Canvas}">

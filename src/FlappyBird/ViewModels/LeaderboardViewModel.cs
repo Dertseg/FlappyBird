@@ -2,12 +2,11 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using FlappyBird.Data;
 using FlappyBird.Models;
-using FlappyBird.Services;
 namespace FlappyBird.ViewModels;
 
-public partial class LeaderboardViewModel(IGameStore store, GameSession session) : BaseViewModel(store)
+public partial class LeaderboardViewModel(IGameStore store) : BaseViewModel(store)
 {
-    private Guid? seenResult;
+    private GameResult? latestResult;
     private bool loaded;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsEmpty))] private IReadOnlyList<ScoreRow> leaders = [];
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasLastRunNote))] private string lastRunNote = "";
@@ -23,25 +22,33 @@ public partial class LeaderboardViewModel(IGameStore store, GameSession session)
     [RelayCommand]
     private async Task LoadAsync() => await TryAsync(async () =>
     {
-        if (session.LastSavedResult is { } latest && latest.Id != seenResult)
-        { SelectedDifficulty = latest.Difficulty; seenResult = latest.Id; }
-        else if (!loaded) SelectedDifficulty = (await Store.GetSettingsAsync()).DefaultDifficulty;
-        await RefreshAsync(); loaded = true;
+        var latest = await Store.GetLatestResultAsync();
+        var difficulty = SelectedDifficulty;
+        if (latest is not null && latest.Id != latestResult?.Id)
+            difficulty = latest.Difficulty;
+        else if (!loaded)
+            difficulty = (await Store.GetSettingsAsync()).DefaultDifficulty;
+
+        await RefreshAsync(difficulty, latest);
+        latestResult = latest;
+        loaded = true;
     }, "Не удалось загрузить рекорды. Нажми «Обновить».");
-    private async Task RefreshAsync()
+    private async Task RefreshAsync(Difficulty difficulty, GameResult? last)
     {
-        var top = await Store.GetTopAsync(SelectedDifficulty);
-        var last = session.LastSavedResult;
-        Leaders = top.Select((x, i) => new ScoreRow(i + 1, x.PlayerName, x.Score,
+        var top = await Store.GetTopAsync(difficulty);
+        var rows = top.Select((x, i) => new ScoreRow(i + 1, x.PlayerName, x.Score,
             x.PlayedAtUtc.ToLocalTime().ToString("dd.MM.yyyy · HH:mm"), x.Id == last?.Id)).ToArray();
-        LastRunNote = last is not null && last.Difficulty == SelectedDifficulty
-            ? Leaders.Any(x => x.IsLatest) ? "Твой последний полёт выделен в таблице" : $"Последний полёт: {last.Score} очк. До попадания в топ‑10 — ещё немного практики!"
+        var note = last is not null && last.Difficulty == difficulty
+            ? rows.Any(x => x.IsLatest) ? "Твой последний полёт выделен в таблице" : $"Последний полёт: {last.Score} очк. До попадания в топ‑10 — ещё немного практики!"
             : "";
+        SelectedDifficulty = difficulty;
+        Leaders = rows;
+        LastRunNote = note;
     }
     [RelayCommand]
     private async Task SelectDifficultyAsync(string value)
     {
         if (!Enum.TryParse<Difficulty>(value, out var difficulty) || !Enum.IsDefined(difficulty)) return;
-        await TryAsync(async () => { SelectedDifficulty = difficulty; await RefreshAsync(); }, "Не удалось загрузить этот уровень. Повтори выбор.");
+        await TryAsync(() => RefreshAsync(difficulty, latestResult), "Не удалось загрузить этот уровень. Повтори выбор.");
     }
 }

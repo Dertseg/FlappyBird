@@ -13,7 +13,7 @@ public abstract partial class BaseViewModel(IGameStore store) : ObservableObject
     {
         if (IsBusy) return false;
         IsBusy = true; Status = "";
-        try { await Store.InitializeAsync(); await action(); return true; }
+        try { await action(); return true; }
         catch (Exception ex) { System.Diagnostics.Debug.WriteLine(ex); Status = failure; return false; }
         finally { IsBusy = false; }
     }

@@ -7,7 +7,6 @@ public static class MauiProgram
         builder.Services.AddSingleton<IGameStore>(_ => new SqliteGameStore(Path.Combine(FileSystem.AppDataDirectory, "flappybird.db")));
         builder.Services.AddSingleton<IGameFeedback, AndroidFeedback>();
         builder.Services.AddSingleton<INavigationService, ShellNavigationService>();
-        builder.Services.AddSingleton<GameSession>();
         builder.Services.AddSingleton<GameViewModel>();
         builder.Services.AddSingleton<HomeViewModel>(); builder.Services.AddSingleton<HomePage>();
         builder.Services.AddSingleton<LeaderboardViewModel>(); builder.Services.AddSingleton<LeaderboardPage>();

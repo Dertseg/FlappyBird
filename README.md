@@ -42,7 +42,7 @@ Android-игра на **C# / .NET MAUI**, организованная по **MV
 | ViewModels | HomeViewModel, GameViewModel, LeaderboardViewModel, AchievementsViewModel, SettingsViewModel; общая обработка загрузки и ошибок в BaseViewModel |
 | Views | Пять XAML-страниц, общий StatusBanner, Drawing/GameRenderer |
 | Data | IGameStore, SqliteGameStore, GameDbContext, миграции EF Core |
-| Services | Навигация Shell, звук/вибрация и GameSession для подсветки последней сохранённой попытки |
+| Services | Навигация Shell, звук и вибрация |
 | Resources | Иллюстрации, иконки, звуки и ресурсы запуска |
 | Platforms | Android-точки входа и манифест |
 

@@ -23,14 +23,13 @@ public partial class HomeViewModel(IGameStore store, INavigationService navigati
     [RelayCommand]
     private async Task LoadAsync() => await TryAsync(async () =>
     {
-        var settings = await Store.GetSettingsAsync();
-        Greeting = $"{settings.PlayerName}, пора летать!"; SelectedDifficulty = settings.DefaultDifficulty;
-        await RefreshScoreAsync();
-        Attempts = (await Store.GetStatisticsAsync()).Attempts;
-        var achievements = await Store.GetAchievementsAsync();
-        AchievementsSummary = $"{achievements.Count(x => x.IsUnlocked)} из {achievements.Count} достижений";
+        var summary = await Store.GetHomeSummaryAsync();
+        Greeting = $"{summary.Settings.PlayerName}, пора летать!";
+        SelectedDifficulty = summary.Settings.DefaultDifficulty;
+        BestScore = summary.BestScore;
+        Attempts = summary.Attempts;
+        AchievementsSummary = $"{summary.UnlockedAchievements} из {AchievementCatalog.All.Count} достижений";
     }, "Не удалось загрузить данные. Проверь свободное место и нажми «Обновить».");
-    private async Task RefreshScoreAsync() => BestScore = (await Store.GetTopAsync(SelectedDifficulty)).FirstOrDefault()?.Score ?? 0;
 
     [RelayCommand]
     private async Task SelectDifficultyAsync(string value)
@@ -39,7 +38,10 @@ public partial class HomeViewModel(IGameStore store, INavigationService navigati
         await TryAsync(async () =>
         {
             var settings = await Store.GetSettingsAsync(); settings.DefaultDifficulty = difficulty;
-            await Store.SaveSettingsAsync(settings); SelectedDifficulty = difficulty; await RefreshScoreAsync();
+            int best = await Store.GetBestScoreAsync(difficulty);
+            await Store.SaveSettingsAsync(settings);
+            SelectedDifficulty = difficulty;
+            BestScore = best;
         }, "Не удалось сохранить уровень. Повтори выбор.");
     }
     [RelayCommand]
@@ -48,6 +50,11 @@ public partial class HomeViewModel(IGameStore store, INavigationService navigati
         if (await game.PrepareAsync(SelectedDifficulty)) await navigation.GoToAsync(Destination.Game);
         else Status = game.Status;
     }, "Не удалось начать игру. Попробуй ещё раз.");
-    [RelayCommand] private Task AchievementsAsync() => navigation.GoToAsync(Destination.Achievements);
-    [RelayCommand] private Task LeaderboardAsync() => navigation.GoToAsync(Destination.Leaderboard);
+    [RelayCommand]
+    private Task AchievementsAsync() => TryAsync(() => navigation.GoToAsync(Destination.Achievements),
+        "Не удалось открыть достижения. Попробуй ещё раз.");
+
+    [RelayCommand]
+    private Task LeaderboardAsync() => TryAsync(() => navigation.GoToAsync(Destination.Leaderboard),
+        "Не удалось открыть рекорды. Попробуй ещё раз.");
 }

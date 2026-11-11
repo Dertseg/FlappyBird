@@ -6,16 +6,28 @@ public sealed class SqliteGameStore(string databasePath) : IGameStore
 {
     private readonly SemaphoreSlim gate = new(1, 1);
     private bool initialized;
-    private GameDbContext CreateContext() => new(new DbContextOptionsBuilder<GameDbContext>()
-        .UseSqlite(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = databasePath, ForeignKeys = true }.ToString()).Options);
+    private readonly DbContextOptions<GameDbContext> options = new DbContextOptionsBuilder<GameDbContext>()
+        .UseSqlite(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = databasePath, ForeignKeys = true }.ToString()).Options;
     private async Task<T> RunAsync<T>(Func<GameDbContext, T> action)
     {
         await gate.WaitAsync();
-        try { return await Task.Run(() => { using var db = CreateContext(); return action(db); }); }
+        try
+        {
+            return await Task.Run(() =>
+            {
+                using var db = new GameDbContext(options);
+                EnsureInitialized(db);
+                return action(db);
+            });
+        }
         finally { gate.Release(); }
     }
-    private static GameStatistics Statistics(GameDbContext db) => new(db.Results.Count(x => x.Mode == "Classic"),
-        db.Results.Where(x => x.Mode == "Classic").Select(x => (int?)x.Score).Max() ?? 0);
+    private static IQueryable<GameResult> ClassicResults(GameDbContext db) =>
+        db.Results.AsNoTracking().Where(x => x.Mode == "Classic");
+
+    private static GameStatistics Statistics(GameDbContext db) => ClassicResults(db)
+        .GroupBy(x => x.Mode).Select(group => new GameStatistics(group.Count(), group.Max(x => x.Score)))
+        .SingleOrDefault() ?? new GameStatistics(0, 0);
     private static IReadOnlyList<string> Unlock(GameDbContext db)
     {
         var stats = Statistics(db);
@@ -24,14 +36,17 @@ public sealed class SqliteGameStore(string databasePath) : IGameStore
         foreach (var definition in earned) db.Achievements.Add(new Achievement { Id = definition.Id, UnlockedAtUtc = DateTime.UtcNow });
         db.SaveChanges(); return earned.Select(x => x.Id).ToArray();
     }
-    public async Task InitializeAsync() => await RunAsync(db =>
+    public Task InitializeAsync() => RunAsync(_ => true);
+
+    private void EnsureInitialized(GameDbContext db)
     {
-        if (initialized) return true;
+        if (initialized) return;
         db.Database.Migrate();
         using var transaction = db.Database.BeginTransaction();
         Unlock(db); // Existing attempts count when upgrading from version 1.
-        transaction.Commit(); initialized = true; return true;
-    });
+        transaction.Commit();
+        initialized = true;
+    }
     public async Task<SaveOutcome> SaveResultAsync(GameResult result)
     {
         if (result.Id == Guid.Empty || result.Score < 0 || !double.IsFinite(result.DurationSeconds) || result.DurationSeconds < 0 ||
@@ -48,10 +63,28 @@ public sealed class SqliteGameStore(string databasePath) : IGameStore
     public async Task<IReadOnlyList<GameResult>> GetTopAsync(Difficulty difficulty)
     {
         _ = DifficultyCatalog.Get(difficulty);
-        return await RunAsync(db => (IReadOnlyList<GameResult>)db.Results.AsNoTracking()
-            .Where(x => x.Mode == "Classic" && x.Difficulty == difficulty)
+        return await RunAsync(db => (IReadOnlyList<GameResult>)ClassicResults(db)
+            .Where(x => x.Difficulty == difficulty)
             .OrderByDescending(x => x.Score).ThenBy(x => x.PlayedAtUtc).ThenBy(x => x.Id).Take(10).ToArray());
     }
+    public Task<GameResult?> GetLatestResultAsync() => RunAsync(db => ClassicResults(db)
+        .OrderByDescending(x => x.PlayedAtUtc).ThenByDescending(x => x.Id).FirstOrDefault());
+
+    private static int BestScore(GameDbContext db, Difficulty difficulty) => ClassicResults(db)
+        .Where(x => x.Difficulty == difficulty).Select(x => (int?)x.Score).Max() ?? 0;
+
+    public Task<int> GetBestScoreAsync(Difficulty difficulty)
+    {
+        _ = DifficultyCatalog.Get(difficulty);
+        return RunAsync(db => BestScore(db, difficulty));
+    }
+
+    public Task<HomeSummary> GetHomeSummaryAsync() => RunAsync(db =>
+    {
+        var settings = ReadSettings(db);
+        return new HomeSummary(settings, BestScore(db, settings.DefaultDifficulty),
+            ClassicResults(db).Count(), db.Achievements.Count());
+    });
     public async Task<GameStatistics> GetStatisticsAsync() => await RunAsync(Statistics);
     public async Task<IReadOnlyList<AchievementProgress>> GetAchievementsAsync() => await RunAsync(db =>
     {
@@ -60,7 +93,10 @@ public sealed class SqliteGameStore(string databasePath) : IGameStore
         return (IReadOnlyList<AchievementProgress>)AchievementCatalog.All.Select(x => new AchievementProgress(x,
             AchievementCatalog.Current(x, stats), unlocked.TryGetValue(x.Id, out var date) ? date : null)).ToArray();
     });
-    public async Task<PlayerSettings> GetSettingsAsync() => await RunAsync(db => db.Settings.AsNoTracking().SingleOrDefault(x => x.Id == 1) ?? new PlayerSettings());
+    private static PlayerSettings ReadSettings(GameDbContext db) =>
+        db.Settings.AsNoTracking().SingleOrDefault(x => x.Id == 1) ?? new PlayerSettings();
+
+    public Task<PlayerSettings> GetSettingsAsync() => RunAsync(ReadSettings);
     public async Task SaveSettingsAsync(PlayerSettings settings)
     {
         _ = DifficultyCatalog.Get(settings.DefaultDifficulty);

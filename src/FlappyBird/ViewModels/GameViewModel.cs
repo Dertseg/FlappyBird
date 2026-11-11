@@ -5,7 +5,7 @@ using FlappyBird.Models;
 using FlappyBird.Services;
 namespace FlappyBird.ViewModels;
 
-public partial class GameViewModel(IGameStore store, IGameFeedback feedback, INavigationService navigation, GameSession session) : BaseViewModel(store)
+public partial class GameViewModel(IGameStore store, IGameFeedback feedback, INavigationService navigation) : BaseViewModel(store)
 {
     private PlayerSettings settings = new();
     private GameResult? pendingResult;
@@ -26,6 +26,7 @@ public partial class GameViewModel(IGameStore store, IGameFeedback feedback, INa
     [ObservableProperty] private double medalFraction;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasNewAchievements))] private string newAchievementsText = "";
     [ObservableProperty] private bool canRetrySave;
+    [ObservableProperty] private bool isChoosingExit;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasCountdown))] private string countdownText = "";
     public bool IsReady => Phase == GameState.Ready;
     public bool IsPlaying => Phase == GameState.Playing;
@@ -42,11 +43,11 @@ public partial class GameViewModel(IGameStore store, IGameFeedback feedback, INa
         return await TryAsync(async () =>
         {
             var loadedSettings = await Store.GetSettingsAsync();
-            int best = (await Store.GetTopAsync(difficulty)).FirstOrDefault()?.Score ?? 0;
+            int best = await Store.GetBestScoreAsync(difficulty);
             CancelCountdown(); settings = loadedSettings; Engine.Reset(difficulty);
             PreviousBest = best; BestScore = best; Score = 0; DurationSeconds = 0;
             DifficultyName = DifficultyCatalog.Get(difficulty).Name;
-            CanRetrySave = false; NewAchievementsText = ""; MedalText = ""; NextMedalText = "";
+            CanRetrySave = false; IsChoosingExit = false; NewAchievementsText = ""; MedalText = ""; NextMedalText = "";
             Phase = GameState.Ready; FrameChanged?.Invoke();
         }, "Не удалось подготовить полёт. Вернись в меню и попробуй снова.");
     }
@@ -85,7 +86,8 @@ public partial class GameViewModel(IGameStore store, IGameFeedback feedback, INa
     [RelayCommand]
     private async Task ResumeAsync()
     {
-        if (!IsPaused || countdown is not null) return;
+        if (!IsPaused || IsBusy || countdown is not null) return;
+        IsChoosingExit = false;
         using var source = new CancellationTokenSource(); countdown = source;
         try
         {
@@ -99,8 +101,27 @@ public partial class GameViewModel(IGameStore store, IGameFeedback feedback, INa
     [RelayCommand]
     private void Finish()
     {
-        if (!IsPaused || HasCountdown) return;
+        if (!IsPaused || IsBusy || HasCountdown) return;
+        IsChoosingExit = false;
         CancelCountdown(); Engine.Finish(); Score = Engine.Score; CompleteAttempt();
+    }
+    [RelayCommand]
+    private void ChooseExit()
+    {
+        if (!IsPaused || IsBusy) return;
+        CancelCountdown();
+        IsChoosingExit = true;
+    }
+
+    [RelayCommand]
+    private void CancelExit() => IsChoosingExit = false;
+
+    [RelayCommand]
+    private async Task ExitWithoutSavingAsync()
+    {
+        if (!IsPaused || !IsChoosingExit || IsBusy) return;
+        if (await TryAsync(() => navigation.GoToAsync(Destination.Home), "Не удалось выйти из игры. Попробуй ещё раз."))
+            IsChoosingExit = false;
     }
     [RelayCommand]
     private async Task SaveResultAsync()
@@ -111,7 +132,7 @@ public partial class GameViewModel(IGameStore store, IGameFeedback feedback, INa
         {
             var result = pendingResult;
             var outcome = await Store.SaveResultAsync(result);
-            pendingResult = null; session.LastSavedResult = result; BestScore = Math.Max(PreviousBest, result.Score);
+            pendingResult = null; BestScore = Math.Max(PreviousBest, result.Score);
             NewAchievementsText = string.Join(" • ", AchievementCatalog.All.Where(x => outcome.NewAchievementIds.Contains(x.Id)).Select(x => x.Title));
             Status = "Результат сохранён на устройстве";
         }
@@ -142,6 +163,12 @@ public partial class GameViewModel(IGameStore store, IGameFeedback feedback, INa
     [RelayCommand] private Task AchievementsAsync() => LeaveAsync(Destination.Achievements);
     public void HandleBack()
     {
-        if (IsPlaying || IsPaused) Pause(); else HomeCommand.Execute(null);
+        if (IsPlaying) Pause();
+        else if (IsPaused)
+        {
+            if (IsChoosingExit) CancelExit();
+            else ChooseExit();
+        }
+        else HomeCommand.Execute(null);
     }
 }

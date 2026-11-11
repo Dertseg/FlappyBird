@@ -1,10 +1,13 @@
 namespace FlappyBird;
 public partial class AppShell : Shell
 {
-    public AppShell(HomePage home, LeaderboardPage records, AchievementsPage achievements, SettingsPage settings)
+    public AppShell(IServiceProvider services)
     {
-        InitializeComponent(); HomeContent.Content = home; RecordsContent.Content = records;
-        AchievementsContent.Content = achievements; SettingsContent.Content = settings;
+        InitializeComponent();
+        HomeContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<HomePage>());
+        RecordsContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<LeaderboardPage>());
+        AchievementsContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<AchievementsPage>());
+        SettingsContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<SettingsPage>());
         Routing.RegisterRoute("game", typeof(GamePage));
     }
     protected override bool OnBackButtonPressed()
