@@ -10,7 +10,7 @@ public partial class AchievementsViewModel(IGameStore store) : BaseViewModel(sto
     [ObservableProperty] private string summary = "Каждый полёт приближает к цели";
     [ObservableProperty] private double completion;
     [RelayCommand]
-    private async Task LoadAsync() => await TryAsync(async () =>
+    private Task LoadAsync() => LoadPageAsync(async () =>
     {
         Achievements = await Store.GetAchievementsAsync();
         int earned = Achievements.Count(x => x.IsUnlocked);

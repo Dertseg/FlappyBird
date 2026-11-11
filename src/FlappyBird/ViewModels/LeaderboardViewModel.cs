@@ -26,7 +26,7 @@ public partial class LeaderboardViewModel(IGameStore store) : BaseViewModel(stor
     public bool IsNormal => SelectedDifficulty == Difficulty.Normal;
     public bool IsHard => SelectedDifficulty == Difficulty.Hard;
     [RelayCommand]
-    private async Task LoadAsync() => await TryAsync(async () =>
+    private Task LoadAsync() => LoadPageAsync(async () =>
     {
         var latest = await Store.GetLatestResultAsync();
         var difficulty = SelectedDifficulty;

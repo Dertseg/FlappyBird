@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <Shell xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
        x:Class="FlappyBird.AppShell" FlyoutBehavior="Disabled" Shell.NavBarIsVisible="False"
-       Shell.TabBarBackgroundColor="White" Shell.TabBarForegroundColor="#087F73" Shell.TabBarTitleColor="#087F73" Shell.TabBarUnselectedColor="#738499">
+       Shell.TabBarBackgroundColor="White" Shell.TabBarForegroundColor="#087F73" Shell.TabBarTitleColor="#087F73" Shell.TabBarUnselectedColor="#526577">
   <TabBar>
     <ShellContent x:Name="HomeContent" Route="home" Title="Главная" Icon="tab_home.svg" />
     <ShellContent x:Name="RecordsContent" Route="records" Title="Рекорды" Icon="tab_records.svg" />

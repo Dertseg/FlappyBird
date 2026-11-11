@@ -6,6 +6,8 @@ public sealed class SqliteGameStore(string databasePath) : IGameStore
 {
     private readonly SemaphoreSlim gate = new(1, 1);
     private bool initialized;
+    private long revision;
+    public long Revision => Interlocked.Read(ref revision);
     private readonly DbContextOptions<GameDbContext> options = new DbContextOptionsBuilder<GameDbContext>()
         .UseSqlite(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = databasePath, ForeignKeys = true }.ToString()).Options;
     private async Task<T> RunAsync<T>(Func<GameDbContext, T> action)
@@ -64,7 +66,9 @@ public sealed class SqliteGameStore(string databasePath) : IGameStore
             if (db.Results.Any(x => x.Id == result.Id)) return new SaveOutcome([]);
             db.Results.Add(result); db.SaveChanges();
             var achievements = Unlock(db);
-            transaction.Commit(); return new SaveOutcome(achievements);
+            transaction.Commit();
+            Interlocked.Increment(ref revision);
+            return new SaveOutcome(achievements);
         });
     }
     public async Task<IReadOnlyList<GameResult>> GetTopAsync(Difficulty difficulty)
@@ -122,7 +126,9 @@ public sealed class SqliteGameStore(string databasePath) : IGameStore
             saved.DefaultDifficulty = settings.DefaultDifficulty;
             saved.SoundEnabled = settings.SoundEnabled;
             saved.VibrationEnabled = settings.VibrationEnabled;
-            db.SaveChanges(); return true;
+            db.SaveChanges();
+            Interlocked.Increment(ref revision);
+            return true;
         });
     }
 
@@ -133,6 +139,7 @@ public sealed class SqliteGameStore(string databasePath) : IGameStore
         {
             EditSettings(db).BirdSkinId = id;
             db.SaveChanges();
+            Interlocked.Increment(ref revision);
             return true;
         });
     }

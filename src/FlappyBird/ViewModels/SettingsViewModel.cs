@@ -12,7 +12,7 @@ public partial class SettingsViewModel(IGameStore store) : BaseViewModel(store)
     [ObservableProperty] private DifficultyOption selectedDifficulty = DifficultyCatalog.Get(Difficulty.Normal);
     public IReadOnlyList<DifficultyOption> Difficulties => DifficultyCatalog.All;
     [RelayCommand]
-    private async Task LoadAsync() => await TryAsync(async () =>
+    private Task LoadAsync() => LoadPageAsync(async () =>
     {
         var settings = await Store.GetSettingsAsync();
         PlayerName = settings.PlayerName; SoundEnabled = settings.SoundEnabled; VibrationEnabled = settings.VibrationEnabled;

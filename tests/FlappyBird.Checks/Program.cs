@@ -136,6 +136,7 @@ try
     await settingsVm.SaveCommand.ExecuteAsync(null);
     Check((await store.GetSettingsAsync()).PlayerName == "Сокол", "Settings trim and persist name");
     var home = new HomeViewModel(store, nav, game); await home.LoadCommand.ExecuteAsync(null);
+    Check(!home.NeedsReload, "Home data remains current until a successful write");
     nav.Fail = true;
     await home.AchievementsCommand.ExecuteAsync(null);
     Check(home.HasStatus && !home.IsBusy, "Home handles achievements navigation failure");
@@ -150,10 +151,12 @@ try
     home.OpenSkinPickerCommand.Execute(null);
     home.DraftSkinId = "mint";
     home.CloseSkinPickerCommand.Execute(null);
+    Check(home.SavedSkin.Id == "sun", "Unsaved selection does not change the badge");
     home.OpenSkinPickerCommand.Execute(null);
     Check(home.DraftSkinId == "sun", "Closing skin picker discards unsaved choice");
     home.DraftSkinId = "sky";
     await home.SaveSkinCommand.ExecuteAsync(null);
+    Check(home.SavedSkin.Id == "sky" && home.NeedsReload, "Saving the skin changes the badge and invalidates cached data");
     await settingsVm.SaveCommand.ExecuteAsync(null);
     Check((await new SqliteGameStore(path).GetSettingsAsync()).BirdSkinId == "sky", "Skin survives restart and editing settings");
     Check(await game.PrepareAsync(Difficulty.Hard) && game.Skin.Id == "sky", "Flight uses the saved skin");
@@ -234,6 +237,7 @@ sealed class FakeNavigation : INavigationService
 }
 sealed class FaultStore(IGameStore inner) : IGameStore
 {
+    public long Revision => inner.Revision;
     private bool fail = true;
     public bool FailTop { get; set; }
     public Task InitializeAsync() => inner.InitializeAsync();

@@ -13,9 +13,11 @@ public partial class HomeViewModel(IGameStore store, INavigationService navigati
     [ObservableProperty] private string achievementsSummary = $"0 из {AchievementCatalog.All.Count} достижений";
     [ObservableProperty] private bool isSkinPickerOpen;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(DraftSkin))] private string draftSkinId = BirdSkin.All[0].Id;
-    private string savedSkinId = BirdSkin.All[0].Id;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(SkinButtonDescription))]
+    private BirdSkin savedSkin = BirdSkin.All[0];
     public IReadOnlyList<BirdSkin> Skins => BirdSkin.All;
     public BirdSkin DraftSkin => BirdSkin.Get(DraftSkinId);
+    public string SkinButtonDescription => $"Выбрать скин птицы. Сейчас выбран: {SavedSkin.Name}";
     [ObservableProperty, NotifyPropertyChangedFor(nameof(DifficultyName)), NotifyPropertyChangedFor(nameof(DifficultyDescription)),
         NotifyPropertyChangedFor(nameof(IsEasy)), NotifyPropertyChangedFor(nameof(IsNormal)), NotifyPropertyChangedFor(nameof(IsHard))]
     private Difficulty selectedDifficulty = Difficulty.Normal;
@@ -26,10 +28,10 @@ public partial class HomeViewModel(IGameStore store, INavigationService navigati
     public bool IsHard => SelectedDifficulty == Difficulty.Hard;
 
     [RelayCommand]
-    private async Task LoadAsync() => await TryAsync(async () =>
+    private Task LoadAsync() => LoadPageAsync(async () =>
     {
         var summary = await Store.GetHomeSummaryAsync();
-        savedSkinId = BirdSkin.Get(summary.Settings.BirdSkinId).Id;
+        SavedSkin = BirdSkin.Get(summary.Settings.BirdSkinId);
         Greeting = $"{summary.Settings.PlayerName}, пора летать!";
         SelectedDifficulty = summary.Settings.DefaultDifficulty;
         BestScore = summary.BestScore;
@@ -41,7 +43,7 @@ public partial class HomeViewModel(IGameStore store, INavigationService navigati
     private void OpenSkinPicker()
     {
         if (IsBusy) return;
-        DraftSkinId = savedSkinId;
+        DraftSkinId = SavedSkin.Id;
         IsSkinPickerOpen = true;
     }
 
@@ -54,9 +56,9 @@ public partial class HomeViewModel(IGameStore store, INavigationService navigati
     [RelayCommand]
     private Task SaveSkinAsync() => TryAsync(async () =>
     {
-        var id = BirdSkin.Get(DraftSkinId).Id;
-        await Store.SaveBirdSkinAsync(id);
-        savedSkinId = id;
+        var skin = DraftSkin;
+        await Store.SaveBirdSkinAsync(skin.Id);
+        SavedSkin = skin;
         IsSkinPickerOpen = false;
     }, "Не удалось сохранить скин. Попробуй ещё раз.");
 

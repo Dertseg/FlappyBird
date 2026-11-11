@@ -2,6 +2,7 @@ using FlappyBird.Models;
 namespace FlappyBird.Data;
 public interface IGameStore
 {
+    long Revision { get; }
     Task InitializeAsync();
     Task<SaveOutcome> SaveResultAsync(GameResult result);
     Task<IReadOnlyList<GameResult>> GetTopAsync(Difficulty difficulty);
