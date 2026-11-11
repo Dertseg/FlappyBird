@@ -2,6 +2,7 @@ using FlappyBird.Models;
 namespace FlappyBird.Data;
 public interface IGameStore
 {
+    void DiscardPendingResult(Guid id) { }
     long Revision { get; }
     Task InitializeAsync();
     Task<SaveOutcome> SaveResultAsync(GameResult result);

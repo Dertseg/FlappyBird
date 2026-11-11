@@ -6,6 +6,12 @@ namespace FlappyBird.ViewModels;
 
 public partial class SettingsViewModel(IGameStore store) : BaseViewModel(store)
 {
+    private bool loading;
+    public bool IsDirty { get; private set; }
+    partial void OnPlayerNameChanged(string value) { if (!loading) IsDirty = true; }
+    partial void OnSoundEnabledChanged(bool value) { if (!loading) IsDirty = true; }
+    partial void OnVibrationEnabledChanged(bool value) { if (!loading) IsDirty = true; }
+    partial void OnSelectedDifficultyChanged(DifficultyOption value) { if (!loading) IsDirty = true; }
     [ObservableProperty] private string playerName = "Игрок";
     [ObservableProperty] private bool soundEnabled = true;
     [ObservableProperty] private bool vibrationEnabled = true;
@@ -15,8 +21,10 @@ public partial class SettingsViewModel(IGameStore store) : BaseViewModel(store)
     private Task LoadAsync() => LoadPageAsync(async () =>
     {
         var settings = await Store.GetSettingsAsync();
+        loading = true;
         PlayerName = settings.PlayerName; SoundEnabled = settings.SoundEnabled; VibrationEnabled = settings.VibrationEnabled;
         SelectedDifficulty = DifficultyCatalog.Get(settings.DefaultDifficulty);
+        loading = false; IsDirty = false;
     }, "Не удалось загрузить настройки. Нажми «Обновить».");
     [RelayCommand]
     private async Task SaveAsync() => await TryAsync(async () =>
@@ -26,6 +34,6 @@ public partial class SettingsViewModel(IGameStore store) : BaseViewModel(store)
         if (name.Length > 20) { Status = "Имя должно быть не длиннее 20 символов."; return; }
         await Store.SaveSettingsAsync(new PlayerSettings { PlayerName = name, SoundEnabled = SoundEnabled,
             VibrationEnabled = VibrationEnabled, DefaultDifficulty = SelectedDifficulty.Id });
-        PlayerName = name; Status = "Настройки сохранены";
+        PlayerName = name; IsDirty = false; Status = "Настройки сохранены";
     }, "Не удалось сохранить настройки. Повтори попытку.");
 }

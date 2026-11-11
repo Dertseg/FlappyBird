@@ -57,15 +57,23 @@ public partial class GameViewModel(IGameStore store, IGameFeedback feedback, INa
     {
         if (IsBusy || HasCountdown || Phase is not (GameState.Ready or GameState.Playing)) return;
         Engine.Flap(); Phase = Engine.State;
-        if (settings.SoundEnabled) feedback.Play("flap"); FrameChanged?.Invoke();
+        if (settings.SoundEnabled) SafePlay("flap"); FrameChanged?.Invoke();
     }
     public void Advance(double seconds)
     {
         if (!IsPlaying) return;
         var before = Engine.Score; Engine.Advance(seconds); Score = Engine.Score;
-        if (before != Score && settings.SoundEnabled) feedback.Play("point");
+        if (before != Score && settings.SoundEnabled) SafePlay("point");
         FrameChanged?.Invoke();
         if (Engine.State == GameState.GameOver) CompleteAttempt();
+    }
+    private void SafePlay(string sound)
+    {
+        try { feedback.Play(sound); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine(ex); }
+    }
+    private void SafeVibrate()
+    {
+        try { feedback.Vibrate(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine(ex); }
     }
     private void CompleteAttempt()
     {
@@ -73,7 +81,7 @@ public partial class GameViewModel(IGameStore store, IGameFeedback feedback, INa
         Phase = GameState.GameOver; DurationSeconds = Engine.Elapsed;
         ResultTitle = Score > PreviousBest ? "Новый рекорд!" : "Каждый полёт — опыт";
         MedalText = MedalProgress.Earned(Score); NextMedalText = MedalProgress.Next(Score); MedalFraction = MedalProgress.Fraction(Score);
-        if (settings.SoundEnabled) feedback.Play("hit"); if (settings.VibrationEnabled) feedback.Vibrate();
+        if (settings.SoundEnabled) SafePlay("hit"); if (settings.VibrationEnabled) SafeVibrate();
         pendingResult = new GameResult { Id = Engine.SessionId, PlayerName = settings.PlayerName, Score = Score,
             DurationSeconds = DurationSeconds, PlayedAtUtc = DateTime.UtcNow, Difficulty = Engine.Difficulty };
         SaveResultCommand.Execute(null);
@@ -144,6 +152,8 @@ public partial class GameViewModel(IGameStore store, IGameFeedback feedback, INa
     private void DiscardResult()
     {
         if (IsBusy) return;
+        try { if (pendingResult is not null) Store.DiscardPendingResult(pendingResult.Id); }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine(ex); Status = "Не удалось отменить сохранение. Повтори попытку."; return; }
         pendingResult = null; CanRetrySave = false; Status = "Этот полёт не сохранён";
     }
     [RelayCommand]

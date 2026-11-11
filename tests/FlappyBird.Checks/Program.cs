@@ -221,6 +221,44 @@ try
     Check(failing.IsReady && failing.Engine.SessionId != id && (await store.GetStatisticsAsync()).Attempts == 1, "Explicit discard permits replay without adding attempt");
 }
 finally { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); File.Delete(freshPath); }
+var recoveryPath = Path.Combine(Path.GetTempPath(), "flappy-recovery-" + Guid.NewGuid() + ".db");
+try
+{
+    var original = new SqliteGameStore(recoveryPath);
+    await original.InitializeAsync();
+    var pending = Result(10);
+    using (var db = Context(recoveryPath)) db.Database.ExecuteSqlRaw("CREATE TRIGGER fail_result BEFORE INSERT ON GameResults BEGIN SELECT RAISE(ABORT, 'test failure'); END");
+    bool failed = false;
+    try { await original.SaveResultAsync(pending); } catch (DbUpdateException) { failed = true; }
+    Check(failed && File.Exists(Path.Combine(recoveryPath + ".pending", pending.Id + ".json")), "SQLite failure leaves durable journal");
+    using (var db = Context(recoveryPath)) db.Database.ExecuteSqlRaw("DROP TRIGGER fail_result");
+    Directory.CreateDirectory(recoveryPath + ".pending");
+    File.WriteAllText(Path.Combine(recoveryPath + ".pending", pending.Id + ".json"), System.Text.Json.JsonSerializer.Serialize(pending));
+    var restored = new SqliteGameStore(recoveryPath);
+    await restored.InitializeAsync();
+    Check((await restored.GetTopAsync(Difficulty.Normal)).Single().Id == pending.Id, "Process restart recovers pending result");
+    Check((await restored.GetAchievementsAsync()).Count(x => x.IsUnlocked) == 2, "Recovery grants achievements atomically");
+    await restored.SaveResultAsync(pending);
+    Check((await restored.GetStatisticsAsync()).Attempts == 1, "Recovery and retry do not duplicate result");
+    var vm = new GameViewModel(restored, new ThrowingFeedback(), new FakeNavigation());
+    await vm.PrepareAsync(Difficulty.Normal);
+    vm.FlapCommand.Execute(null); vm.PauseCommand.Execute(null); vm.FinishCommand.Execute(null);
+    await vm.SaveResultCommand.ExecutionTask!;
+    Check(!vm.CanRetrySave && (await restored.GetStatisticsAsync()).Attempts == 2, "Feedback failures cannot prevent saving");
+    var settings = new SettingsViewModel(restored);
+    await settings.LoadCommand.ExecuteAsync(null);
+    settings.PlayerName = "Черновик";
+    await restored.SaveBirdSkinAsync("sky");
+    if (settings.NeedsReload && !settings.IsDirty) await settings.LoadCommand.ExecuteAsync(null);
+    Check(settings.PlayerName == "Черновик" && settings.IsDirty, "Unrelated writes preserve settings draft");
+    await settings.SaveCommand.ExecuteAsync(null);
+    Check(!settings.IsDirty && (await restored.GetSettingsAsync()).PlayerName == "Черновик", "Saving clears draft state");
+}
+finally
+{
+    Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); File.Delete(recoveryPath);
+    if (Directory.Exists(recoveryPath + ".pending")) Directory.Delete(recoveryPath + ".pending", true);
+}
 Console.WriteLine($"PASS: {assertions} assertions. Three difficulties, physics, five ViewModels, migration from v1, SQLite results and achievements.");
 
 sealed class SilentFeedback : IGameFeedback { public void Play(string sound) { } public void Vibrate() { } }
@@ -258,3 +296,5 @@ sealed class FaultStore(IGameStore inner) : IGameStore
         return inner.SaveResultAsync(result);
     }
 }
+
+sealed class ThrowingFeedback : IGameFeedback { public void Play(string sound) => throw new InvalidOperationException("Audio failure"); public void Vibrate() => throw new InvalidOperationException("Haptic failure"); }

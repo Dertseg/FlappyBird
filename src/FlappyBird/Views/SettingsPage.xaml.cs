@@ -14,6 +14,6 @@ public partial class SettingsPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        if (vm.NeedsReload) await vm.LoadCommand.ExecuteAsync(null);
+        if (vm.NeedsReload && !vm.IsDirty) await vm.LoadCommand.ExecuteAsync(null);
     }
 }
