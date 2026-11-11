@@ -5,7 +5,7 @@
     x:Class="FlappyBird.Views.HomePage" x:DataType="vm:HomeViewModel" Shell.NavBarIsVisible="False" >
 
   <Grid>
-  <ScrollView AutomationProperties.ExcludedWithChildren="{Binding IsSkinPickerOpen}">
+  <ScrollView x:Name="HomeContent">
     <VerticalStackLayout Padding="22,18,22,28" Spacing="15" MaximumWidthRequest="600">
       <Grid ColumnDefinitions="*,Auto">
         <VerticalStackLayout Spacing="4"><Label Text="FLAPPY / CLUB" Style="{StaticResource Eyebrow}" /><Label Text="Полетели?" Style="{StaticResource PageTitle}" /><Label Text="{Binding Greeting}" Style="{StaticResource Subtitle}" /></VerticalStackLayout>
