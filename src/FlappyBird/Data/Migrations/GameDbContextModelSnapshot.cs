@@ -65,6 +65,8 @@ namespace FlappyBird.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Mode", "Difficulty", "PlayedAtUtc", "Id");
+
                     b.HasIndex("Mode", "Difficulty", "Score", "PlayedAtUtc");
 
                     b.ToTable("GameResults", (string)null);
@@ -74,6 +76,13 @@ namespace FlappyBird.Data.Migrations
                 {
                     b.Property<int>("Id")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("BirdSkinId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("sun");
 
                     b.Property<string>("DefaultDifficulty")
                         .IsRequired()

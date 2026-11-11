@@ -7,4 +7,5 @@ public sealed class PlayerSettings
     public string PlayerName { get; set; } = "Игрок";
     public bool SoundEnabled { get; set; } = true;
     public bool VibrationEnabled { get; set; } = true;
+    public string BirdSkinId { get; set; } = "sun";
 }

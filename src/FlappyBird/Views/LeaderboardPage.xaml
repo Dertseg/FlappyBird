@@ -4,33 +4,70 @@
     xmlns:controls="clr-namespace:FlappyBird.Views.Controls"
     x:Class="FlappyBird.Views.LeaderboardPage" x:DataType="vm:LeaderboardViewModel" Shell.NavBarIsVisible="False" >
 
-  <Grid Padding="20,20,20,12" RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="14" MaximumWidthRequest="600">
-    <VerticalStackLayout Spacing="5"><Label Text="ЗАЛ РЕКОРДОВ" Style="{StaticResource Eyebrow}" /><Label Text="Лучшие полёты" Style="{StaticResource PageTitle}" /><Label Text="Топ‑10 попыток. Каждый уровень — своя таблица." Style="{StaticResource Subtitle}" /></VerticalStackLayout>
-    <VerticalStackLayout Grid.Row="1"><Border BackgroundColor="White" Stroke="{StaticResource Line}" StrokeShape="RoundRectangle 18" Padding="5"><Grid ColumnDefinitions="*,*,*" ColumnSpacing="4" IsEnabled="{Binding CanInteract}"><Button Grid.Column="0" Text="Лёгкий" Style="{StaticResource SegmentButton}" Command="{Binding SelectDifficultyCommand}" CommandParameter="Easy" SemanticProperties.Description="Уровень: Лёгкий">
+  <Grid Padding="20,16,20,12" RowDefinitions="Auto,Auto,Auto,Auto,*,Auto" RowSpacing="10" MaximumWidthRequest="600">
+    <Label Text="Рекорды" Style="{StaticResource PageTitle}" />
+    <Border Grid.Row="1" BackgroundColor="White" Stroke="{StaticResource Line}" StrokeShape="RoundRectangle 18" Padding="5">
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="4" IsEnabled="{Binding CanInteract}">
+        <Button Text="Лучшие полёты" Command="{Binding SelectListCommand}" CommandParameter="Leaders" Style="{StaticResource SegmentButton}">
+          <Button.Triggers><DataTrigger TargetType="Button" Binding="{Binding ShowLeaders}" Value="True"><Setter Property="BackgroundColor" Value="{StaticResource Accent}" /><Setter Property="TextColor" Value="White" /></DataTrigger></Button.Triggers>
+        </Button>
+        <Button Grid.Column="1" Text="Мои полёты" Command="{Binding SelectListCommand}" CommandParameter="History" Style="{StaticResource SegmentButton}">
+          <Button.Triggers><DataTrigger TargetType="Button" Binding="{Binding ShowHistory}" Value="True"><Setter Property="BackgroundColor" Value="{StaticResource Accent}" /><Setter Property="TextColor" Value="White" /></DataTrigger></Button.Triggers>
+        </Button>
+      </Grid>
+    </Border>
+    <VerticalStackLayout Grid.Row="2"><Border BackgroundColor="White" Stroke="{StaticResource Line}" StrokeShape="RoundRectangle 18" Padding="5"><Grid ColumnDefinitions="*,*,*" ColumnSpacing="4" IsEnabled="{Binding CanInteract}"><Button Grid.Column="0" Text="Лёгкий" Style="{StaticResource SegmentButton}" Command="{Binding SelectDifficultyCommand}" CommandParameter="Easy" SemanticProperties.Description="Уровень: Лёгкий">
           <Button.Triggers><DataTrigger TargetType="Button" Binding="{Binding IsEasy}" Value="True"><Setter Property="BackgroundColor" Value="{StaticResource Accent}" /><Setter Property="TextColor" Value="White" /></DataTrigger></Button.Triggers>
         </Button><Button Grid.Column="1" Text="Обычный" Style="{StaticResource SegmentButton}" Command="{Binding SelectDifficultyCommand}" CommandParameter="Normal" SemanticProperties.Description="Уровень: Обычный">
           <Button.Triggers><DataTrigger TargetType="Button" Binding="{Binding IsNormal}" Value="True"><Setter Property="BackgroundColor" Value="{StaticResource Accent}" /><Setter Property="TextColor" Value="White" /></DataTrigger></Button.Triggers>
         </Button><Button Grid.Column="2" Text="Сложный" Style="{StaticResource SegmentButton}" Command="{Binding SelectDifficultyCommand}" CommandParameter="Hard" SemanticProperties.Description="Уровень: Сложный">
           <Button.Triggers><DataTrigger TargetType="Button" Binding="{Binding IsHard}" Value="True"><Setter Property="BackgroundColor" Value="{StaticResource Accent}" /><Setter Property="TextColor" Value="White" /></DataTrigger></Button.Triggers>
         </Button></Grid></Border></VerticalStackLayout>
-    <Border Grid.Row="2" IsVisible="{Binding HasLastRunNote}" BackgroundColor="#E2F3EE" StrokeThickness="0" Padding="14,10" StrokeShape="RoundRectangle 14"><Label Text="{Binding LastRunNote}" FontSize="13" TextColor="#076B61" /></Border>
-    <CollectionView Grid.Row="3" ItemsSource="{Binding Leaders}" SelectionMode="None">
+    <Border Grid.Row="3" IsVisible="{Binding HasLastRunNote}" BackgroundColor="#E2F3EE" StrokeThickness="0" Padding="14,10" StrokeShape="RoundRectangle 14"><Label Text="{Binding LastRunNote}" FontSize="13" TextColor="#076B61" /></Border>
+    <CollectionView Grid.Row="4" ItemsSource="{Binding Leaders}" IsVisible="{Binding ShowLeaders}" SelectionMode="None"
+                    ItemsUpdatingScrollMode="KeepItemsInView">
       <CollectionView.EmptyView><VerticalStackLayout Padding="20,40" Spacing="12" VerticalOptions="Center"><Label Text="Здесь начнётся история" FontSize="22" FontAttributes="Bold" HorizontalTextAlignment="Center" /><Label Text="Сыграй на выбранном уровне — первый результат появится здесь." Style="{StaticResource Subtitle}" HorizontalTextAlignment="Center" /></VerticalStackLayout></CollectionView.EmptyView>
       <CollectionView.ItemTemplate><DataTemplate x:DataType="models:ScoreRow">
         <Border Style="{StaticResource Card}" Padding="14" Margin="0,0,0,10">
           <Border.Triggers><DataTrigger TargetType="Border" Binding="{Binding IsLatest}" Value="True"><Setter Property="Stroke" Value="#087F73" /><Setter Property="StrokeThickness" Value="2" /><Setter Property="BackgroundColor" Value="#EAF7F2" /></DataTrigger></Border.Triggers>
           <Grid ColumnDefinitions="48,*,Auto" ColumnSpacing="12">
-            <Border BackgroundColor="#EEF2F8" StrokeThickness="0" StrokeShape="RoundRectangle 15" HeightRequest="48" VerticalOptions="Center">
-              <Border.Triggers><DataTrigger TargetType="Border" Binding="{Binding IsPodium}" Value="True"><Setter Property="BackgroundColor" Value="#FFF2DA" /></DataTrigger></Border.Triggers>
-              <Label Text="{Binding Badge}" FontSize="24" HorizontalTextAlignment="Center" VerticalTextAlignment="Center" />
-            </Border>
+            <Label Text="{Binding Badge}" FontSize="22" HorizontalTextAlignment="Center" VerticalTextAlignment="Center" />
             <VerticalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center"><Label Text="{Binding Player}" FontSize="16" FontAttributes="Bold" LineBreakMode="TailTruncation" /><Label Text="{Binding Date}" FontSize="11" TextColor="{StaticResource Muted}" /><Label Text="ПОСЛЕДНИЙ ПОЛЁТ" IsVisible="{Binding IsLatest}" TextColor="#087F73" FontSize="9" FontAttributes="Bold" /></VerticalStackLayout>
             <VerticalStackLayout Grid.Column="2" VerticalOptions="Center"><Label Text="{Binding Score}" FontSize="28" FontAttributes="Bold" HorizontalTextAlignment="End" /><Label Text="очков" FontSize="10" TextColor="{StaticResource Muted}" HorizontalTextAlignment="End" /></VerticalStackLayout>
           </Grid>
         </Border>
       </DataTemplate></CollectionView.ItemTemplate>
     </CollectionView>
-    <VerticalStackLayout Grid.Row="4" Spacing="8"><controls:StatusBanner /><Button Text="Обновить таблицу" Command="{Binding LoadCommand}" Style="{StaticResource SecondaryButton}" /></VerticalStackLayout>
+    <CollectionView Grid.Row="4" ItemsSource="{Binding Flights}" IsVisible="{Binding ShowHistory}" SelectionMode="None"
+                    ItemSizingStrategy="MeasureFirstItem">
+      <CollectionView.Header>
+        <Border Style="{StaticResource Card}" IsVisible="{Binding HasFlights}" Margin="0,0,0,10" Padding="14">
+          <VerticalStackLayout Spacing="6">
+            <Label Text="Счёт по полётам" FontSize="17" FontAttributes="Bold" />
+            <controls:FlightHistoryChart Scores="{Binding FlightScores}" HeightRequest="112" InputTransparent="True"
+                SemanticProperties.Description="График очков от ранних полётов к новым. Значения доступны в списке." />
+            <Label Text="Ранние → новые" Style="{StaticResource Subtitle}" FontSize="11" HorizontalTextAlignment="End" />
+          </VerticalStackLayout>
+        </Border>
+      </CollectionView.Header>
+      <CollectionView.EmptyView>
+        <Label Text="Сыграй на выбранном уровне, чтобы увидеть историю." Padding="20,40"
+               Style="{StaticResource Subtitle}" HorizontalTextAlignment="Center" />
+      </CollectionView.EmptyView>
+      <CollectionView.ItemTemplate>
+        <DataTemplate x:DataType="models:FlightHistoryRow">
+          <Border Style="{StaticResource Card}" Padding="14,10" Margin="0,0,0,8">
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12">
+              <Label Text="{Binding Date}" FontSize="14" FontAttributes="Bold" />
+              <Label Grid.Row="1" Text="{Binding Duration, StringFormat='Время полёта {0}'}" Style="{StaticResource Subtitle}" FontSize="11" />
+              <Label Grid.Column="1" Grid.RowSpan="2" Text="{Binding Score, StringFormat='{0} очк.'}"
+                     FontSize="20" FontAttributes="Bold" VerticalTextAlignment="Center" />
+            </Grid>
+          </Border>
+        </DataTemplate>
+      </CollectionView.ItemTemplate>
+    </CollectionView>
+    <controls:StatusBanner Grid.Row="5" />
   </Grid>
 
 </ContentPage>

@@ -1,7 +1,9 @@
 using FlappyBird.Models;
 namespace FlappyBird.Views.Drawing;
-public sealed class GameRenderer(GameEngine game) : IDrawable
+public sealed class GameRenderer(GameEngine game, BirdSkin skin) : IDrawable
 {
+    private readonly BirdArt bird = new(skin);
+
     public void Draw(ICanvas c, RectF bounds)
     {
         c.FillColor = Color.FromArgb("#C7E9EC"); c.FillRectangle(bounds);
@@ -26,12 +28,7 @@ public sealed class GameRenderer(GameEngine game) : IDrawable
         c.FillColor = Color.FromArgb("#DCE3BD");
         for (int i = 0; i < 20; i++) c.FillRectangle((float)(i * 24 - game.Elapsed * game.PipeSpeed % 24), 610, 12, 4);
         c.SaveState(); c.Translate(100, (float)game.BirdY); c.Rotate((float)Math.Clamp(game.Velocity * 0.09, -22, 65));
-        c.FillColor = Color.FromArgb("#DAA53D"); c.FillEllipse(-17, -16, 36, 34);
-        c.FillColor = Color.FromArgb("#FFD56A"); c.FillEllipse(-17, -18, 34, 32);
-        c.FillColor = Color.FromArgb("#F4B544"); c.FillEllipse(-18, (float)(Math.Sin(game.Elapsed * 24) * 3), 20, 12);
-        c.FillColor = Colors.White; c.FillEllipse(3, -13, 13, 15);
-        c.FillColor = Color.FromArgb("#102A43"); c.FillEllipse(10, -9, 5, 7);
-        c.FillColor = Color.FromArgb("#EB7950"); c.FillRoundedRectangle(12, 0, 16, 8, 3);
+        bird.Draw(c, (float)(Math.Sin(game.Elapsed * 24) * 3));
         c.RestoreState(); c.RestoreState();
     }
 }

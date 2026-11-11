@@ -25,9 +25,16 @@ public sealed class SqliteGameStore(string databasePath) : IGameStore
     private static IQueryable<GameResult> ClassicResults(GameDbContext db) =>
         db.Results.AsNoTracking().Where(x => x.Mode == "Classic");
 
-    private static GameStatistics Statistics(GameDbContext db) => ClassicResults(db)
-        .GroupBy(x => x.Mode).Select(group => new GameStatistics(group.Count(), group.Max(x => x.Score)))
-        .SingleOrDefault() ?? new GameStatistics(0, 0);
+    private static GameStatistics Statistics(GameDbContext db)
+    {
+        var levels = ClassicResults(db).GroupBy(x => x.Difficulty)
+            .Select(group => new { Difficulty = group.Key, Attempts = group.Count(), Best = group.Max(x => x.Score) })
+            .ToArray();
+        return new GameStatistics(levels.Sum(x => x.Attempts), levels.Select(x => x.Best).DefaultIfEmpty().Max())
+        {
+            BestByDifficulty = levels.ToDictionary(x => x.Difficulty, x => x.Best)
+        };
+    }
     private static IReadOnlyList<string> Unlock(GameDbContext db)
     {
         var stats = Statistics(db);
@@ -70,6 +77,13 @@ public sealed class SqliteGameStore(string databasePath) : IGameStore
     public Task<GameResult?> GetLatestResultAsync() => RunAsync(db => ClassicResults(db)
         .OrderByDescending(x => x.PlayedAtUtc).ThenByDescending(x => x.Id).FirstOrDefault());
 
+    public Task<IReadOnlyList<GameResult>> GetRecentAsync(Difficulty difficulty)
+    {
+        _ = DifficultyCatalog.Get(difficulty);
+        return RunAsync(db => (IReadOnlyList<GameResult>)ClassicResults(db).Where(x => x.Difficulty == difficulty)
+            .OrderByDescending(x => x.PlayedAtUtc).ThenByDescending(x => x.Id).Take(20).ToArray());
+    }
+
     private static int BestScore(GameDbContext db, Difficulty difficulty) => ClassicResults(db)
         .Where(x => x.Difficulty == difficulty).Select(x => (int?)x.Score).Max() ?? 0;
 
@@ -103,9 +117,26 @@ public sealed class SqliteGameStore(string databasePath) : IGameStore
         if (string.IsNullOrWhiteSpace(settings.PlayerName) || settings.PlayerName.Trim().Length > 20) throw new ArgumentException("Invalid player name");
         await RunAsync(db =>
         {
-            settings.Id = 1; settings.PlayerName = settings.PlayerName.Trim();
-            if (db.Settings.Any(x => x.Id == 1)) db.Settings.Update(settings); else db.Settings.Add(settings);
+            var saved = EditSettings(db);
+            saved.PlayerName = settings.PlayerName.Trim();
+            saved.DefaultDifficulty = settings.DefaultDifficulty;
+            saved.SoundEnabled = settings.SoundEnabled;
+            saved.VibrationEnabled = settings.VibrationEnabled;
             db.SaveChanges(); return true;
         });
     }
+
+    public Task SaveBirdSkinAsync(string id)
+    {
+        if (BirdSkin.Get(id).Id != id) throw new ArgumentException("Invalid bird skin", nameof(id));
+        return RunAsync(db =>
+        {
+            EditSettings(db).BirdSkinId = id;
+            db.SaveChanges();
+            return true;
+        });
+    }
+
+    private static PlayerSettings EditSettings(GameDbContext db) =>
+        db.Settings.Find(1) ?? db.Settings.Add(new PlayerSettings()).Entity;
 }

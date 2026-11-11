@@ -17,7 +17,7 @@
       <Button Text="Сохранить настройки" Command="{Binding SaveCommand}" />
     </VerticalStackLayout>
     <controls:StatusBanner /><Button Text="Обновить настройки" Command="{Binding LoadCommand}" Style="{StaticResource GhostButton}" />
-    <Label Text="FLAPPY / CLUB · 2.0&#10;Результаты и достижения хранятся локально в SQLite." Style="{StaticResource Subtitle}" FontSize="11" HorizontalTextAlignment="Center" />
+    <Label Text="FLAPPY / CLUB · 2.0" Style="{StaticResource Subtitle}" FontSize="11" HorizontalTextAlignment="Center" />
   </VerticalStackLayout></ScrollView>
 
 </ContentPage>

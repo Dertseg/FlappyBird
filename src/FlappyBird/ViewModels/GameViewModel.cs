@@ -11,6 +11,7 @@ public partial class GameViewModel(IGameStore store, IGameFeedback feedback, INa
     private GameResult? pendingResult;
     private CancellationTokenSource? countdown;
     public GameEngine Engine { get; } = new();
+    public BirdSkin Skin => BirdSkin.Get(settings.BirdSkinId);
     public event Action? FrameChanged;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsReady)), NotifyPropertyChangedFor(nameof(IsPlaying)),
         NotifyPropertyChangedFor(nameof(IsPaused)), NotifyPropertyChangedFor(nameof(IsGameOver)), NotifyPropertyChangedFor(nameof(ShowGameHeader))]

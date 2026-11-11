@@ -5,6 +5,7 @@ public interface IGameStore
     Task InitializeAsync();
     Task<SaveOutcome> SaveResultAsync(GameResult result);
     Task<IReadOnlyList<GameResult>> GetTopAsync(Difficulty difficulty);
+    Task<IReadOnlyList<GameResult>> GetRecentAsync(Difficulty difficulty);
     Task<GameResult?> GetLatestResultAsync();
     Task<HomeSummary> GetHomeSummaryAsync();
     Task<int> GetBestScoreAsync(Difficulty difficulty);
@@ -12,6 +13,7 @@ public interface IGameStore
     Task<IReadOnlyList<AchievementProgress>> GetAchievementsAsync();
     Task<PlayerSettings> GetSettingsAsync();
     Task SaveSettingsAsync(PlayerSettings settings);
+    Task SaveBirdSkinAsync(string id);
 }
 
 public sealed record HomeSummary(PlayerSettings Settings, int BestScore, int Attempts, int UnlockedAchievements);

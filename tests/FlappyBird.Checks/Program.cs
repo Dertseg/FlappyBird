@@ -54,7 +54,7 @@ try
     var store = new SqliteGameStore(path); await store.InitializeAsync(); await store.InitializeAsync();
     using (var db = Context(path))
     {
-        Check(db.Database.GetAppliedMigrations().Count() == 2, "Both migrations applied once");
+        Check(db.Database.GetAppliedMigrations().Count() == 3, "All migrations applied once");
         Check(!db.Database.HasPendingModelChanges(), "Snapshot matches current model");
         var legacy = db.Results.Single();
         Check(legacy.Id == legacyId && legacy.Score == 25 && legacy.Difficulty == Difficulty.Normal, "Legacy scores survive as Normal");
@@ -146,18 +146,42 @@ try
     await home.SelectDifficultyCommand.ExecuteAsync("Hard");
     Check(home.BestScore == 14 && (await store.GetSettingsAsync()).DefaultDifficulty == Difficulty.Hard, "Home changes persist and refresh matching best");
 
+    Check((await store.GetSettingsAsync()).BirdSkinId == "sun" && home.Skins.Count == 7, "Existing profile starts with original skin");
+    home.OpenSkinPickerCommand.Execute(null);
+    home.DraftSkinId = "mint";
+    home.CloseSkinPickerCommand.Execute(null);
+    home.OpenSkinPickerCommand.Execute(null);
+    Check(home.DraftSkinId == "sun", "Closing skin picker discards unsaved choice");
+    home.DraftSkinId = "sky";
+    await home.SaveSkinCommand.ExecuteAsync(null);
+    await settingsVm.SaveCommand.ExecuteAsync(null);
+    Check((await new SqliteGameStore(path).GetSettingsAsync()).BirdSkinId == "sky", "Skin survives restart and editing settings");
+    Check(await game.PrepareAsync(Difficulty.Hard) && game.Skin.Id == "sky", "Flight uses the saved skin");
+    await home.SelectDifficultyCommand.ExecuteAsync("Hard");
+
+    var hardGoal = (await store.GetAchievementsAsync()).Single(x => x.Definition.Id == "hard_50");
+    Check(!hardGoal.IsUnlocked && hardGoal.Current == 14, "Scores on other levels do not advance hard goal");
+    await store.SaveResultAsync(Result(75, Difficulty.Normal));
+    var hardUnlock = await store.SaveResultAsync(Result(50, Difficulty.Hard));
+    Check(hardUnlock.NewAchievementIds.Contains("hard_50"), "Hard goal unlocks at its threshold");
     var attempts = (await store.GetStatisticsAsync()).Attempts;
     for (int i = attempts; i < 100; i++) await store.SaveResultAsync(Result(0));
     achievements = await store.GetAchievementsAsync();
     Check(achievements.All(x => x.IsUnlocked), "Hundred attempts achievement");
     Check((await store.GetStatisticsAsync()).Attempts == 100, "Duplicates do not contribute to attempts");
+    await records.SelectListCommand.ExecuteAsync("History");
+    await records.SelectDifficultyCommand.ExecuteAsync("Normal");
+    Check(records.ShowHistory && records.Flights.Count == 20 &&
+        records.FlightScores.SequenceEqual(records.Flights.Select(x => x.Score).Reverse()), "History is limited to 20 with chronological chart");
+    await records.SelectDifficultyCommand.ExecuteAsync("Easy");
+    Check(records.Flights.Count == 1 && records.Flights[0].Score == 60, "History filters by difficulty");
     var reopened = new SqliteGameStore(path); await reopened.InitializeAsync();
     Check((await reopened.GetAchievementsAsync())[0].UnlockedAtUtc == unlockDate, "Unlock dates survive reopening");
     Check((await reopened.GetAchievementsAsync()).All(x => x.IsUnlocked), "Achievements durable");
     Check((await reopened.GetSettingsAsync()).DefaultDifficulty == Difficulty.Hard, "Difficulty durable");
     var achievementsVm = new AchievementsViewModel(reopened); await achievementsVm.LoadCommand.ExecuteAsync(null);
-    Check(achievementsVm.Completion == 1 && achievementsVm.Achievements.Count == 4, "Achievements page progress");
-    using (var db = Context(path)) Check(db.Achievements.Count() == 4, "No duplicate unlock rows");
+    Check(achievementsVm.Completion == 1 && achievementsVm.Achievements.Count == AchievementCatalog.All.Count, "Achievements page progress");
+    using (var db = Context(path)) Check(db.Achievements.Count() == AchievementCatalog.All.Count, "No duplicate unlock rows");
     bool rejected = false;
     try { await store.SaveResultAsync(Result(-1)); } catch (ArgumentException) { rejected = true; }
     Check(rejected, "Invalid score rejected");
@@ -216,12 +240,14 @@ sealed class FaultStore(IGameStore inner) : IGameStore
     public Task<IReadOnlyList<GameResult>> GetTopAsync(Difficulty difficulty) =>
         FailTop ? Task.FromException<IReadOnlyList<GameResult>>(new IOException("Simulated query failure")) : inner.GetTopAsync(difficulty);
     public Task<GameResult?> GetLatestResultAsync() => inner.GetLatestResultAsync();
+    public Task<IReadOnlyList<GameResult>> GetRecentAsync(Difficulty difficulty) => inner.GetRecentAsync(difficulty);
     public Task<HomeSummary> GetHomeSummaryAsync() => inner.GetHomeSummaryAsync();
     public Task<int> GetBestScoreAsync(Difficulty difficulty) => inner.GetBestScoreAsync(difficulty);
     public Task<GameStatistics> GetStatisticsAsync() => inner.GetStatisticsAsync();
     public Task<IReadOnlyList<AchievementProgress>> GetAchievementsAsync() => inner.GetAchievementsAsync();
     public Task<PlayerSettings> GetSettingsAsync() => inner.GetSettingsAsync();
     public Task SaveSettingsAsync(PlayerSettings settings) => inner.SaveSettingsAsync(settings);
+    public Task SaveBirdSkinAsync(string id) => inner.SaveBirdSkinAsync(id);
     public Task<SaveOutcome> SaveResultAsync(GameResult result)
     {
         if (fail) { fail = false; throw new IOException("Simulated disk failure"); }

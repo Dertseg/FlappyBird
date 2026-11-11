@@ -6,7 +6,7 @@
 
   <ScrollView><VerticalStackLayout Padding="22,20,22,28" Spacing="18" MaximumWidthRequest="600">
     <VerticalStackLayout Spacing="5"><Label Text="ТВОЯ КОЛЛЕКЦИЯ" Style="{StaticResource Eyebrow}" /><Label Text="Достижения" Style="{StaticResource PageTitle}" /><Label Text="Большие рекорды начинаются с маленьких побед." Style="{StaticResource Subtitle}" /></VerticalStackLayout>
-    <Border BackgroundColor="#152C45" StrokeThickness="0" StrokeShape="RoundRectangle 24" Padding="22"><VerticalStackLayout Spacing="14"><Label Text="{Binding Summary}" FontSize="25" FontAttributes="Bold" TextColor="White" /><ProgressBar Progress="{Binding Completion}" ProgressColor="#75D6BF" BackgroundColor="#35506A" /><Label Text="Прогресс общий для всех уровней сложности" FontSize="12" TextColor="#C3D3E3" /></VerticalStackLayout></Border>
+    <Border BackgroundColor="#152C45" StrokeThickness="0" StrokeShape="RoundRectangle 24" Padding="22"><VerticalStackLayout Spacing="14"><Label Text="{Binding Summary}" FontSize="25" FontAttributes="Bold" TextColor="White" /><ProgressBar Progress="{Binding Completion}" ProgressColor="#75D6BF" BackgroundColor="#35506A" /></VerticalStackLayout></Border>
     <VerticalStackLayout Spacing="12" BindableLayout.ItemsSource="{Binding Achievements}">
       <BindableLayout.ItemTemplate><DataTemplate x:DataType="models:AchievementProgress">
         <Border Style="{StaticResource Card}">

@@ -12,13 +12,13 @@ public partial class GamePage : ContentPage
     public GamePage(GameViewModel vm)
     {
         InitializeComponent(); this.vm = vm; BindingContext = vm;
-        GameCanvas.Drawable = new GameRenderer(vm.Engine);
         timer = Dispatcher.CreateTimer(); timer.Interval = TimeSpan.FromMilliseconds(16);
         timer.Tick += (_, _) => { double now = clock.Elapsed.TotalSeconds; vm.Advance(now - previous); previous = now; };
     }
     protected override void OnAppearing()
     {
         base.OnAppearing(); vm.FrameChanged += GameCanvas.Invalidate; vm.PropertyChanged += OnVmChanged;
+        GameCanvas.Drawable = new GameRenderer(vm.Engine, vm.Skin);
         UpdateTimer(); GameCanvas.Invalidate();
     }
     protected override void OnDisappearing()
