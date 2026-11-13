@@ -12,6 +12,11 @@ public partial class HomeViewModel(IGameStore store, INavigationService navigati
     [ObservableProperty] private int attempts;
     [ObservableProperty] private string achievementsSummary = $"0 из {AchievementCatalog.All.Count} достижений";
     [ObservableProperty] private bool isSkinPickerOpen;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(LocationButtonDescription))]
+    private FlightLocation selectedLocation = FlightLocation.All[0];
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(Locations))] private bool isLocationPickerOpen;
+    public IReadOnlyList<FlightLocation> Locations => IsLocationPickerOpen ? FlightLocation.All : [];
+    public string LocationButtonDescription => $"Выбрать локацию. Сейчас выбрана: {SelectedLocation.Name}";
     [ObservableProperty, NotifyPropertyChangedFor(nameof(DraftSkin))] private string draftSkinId = BirdSkin.All[0].Id;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(SkinButtonDescription))]
     private BirdSkin savedSkin = BirdSkin.All[0];
@@ -32,12 +37,40 @@ public partial class HomeViewModel(IGameStore store, INavigationService navigati
     {
         var summary = await Store.GetHomeSummaryAsync();
         SavedSkin = BirdSkin.Get(summary.Settings.BirdSkinId);
+        SelectedLocation = FlightLocation.Get(summary.Settings.FlightLocationId);
         Greeting = $"{summary.Settings.PlayerName}, пора летать!";
         SelectedDifficulty = summary.Settings.DefaultDifficulty;
         BestScore = summary.BestScore;
         Attempts = summary.Attempts;
         AchievementsSummary = $"{summary.UnlockedAchievements} из {AchievementCatalog.All.Count} достижений";
     }, "Не удалось загрузить данные. Открой главную снова.");
+
+    [RelayCommand]
+    private void OpenLocationPicker()
+    {
+        if (!IsBusy) IsLocationPickerOpen = true;
+    }
+
+    [RelayCommand]
+    private void CloseLocationPicker()
+    {
+        if (!IsBusy) IsLocationPickerOpen = false;
+    }
+
+    [RelayCommand]
+    private Task SelectLocationAsync(FlightLocation? location)
+    {
+        if (location is null || !IsLocationPickerOpen) return Task.CompletedTask;
+        return TryAsync(async () =>
+        {
+            if (SelectedLocation.Id != location.Id)
+            {
+                await Store.SaveFlightLocationAsync(location.Id);
+                SelectedLocation = location;
+            }
+            IsLocationPickerOpen = false;
+        }, "Не удалось сохранить локацию. Попробуй ещё раз.");
+    }
 
     [RelayCommand]
     private void OpenSkinPicker()

@@ -14,6 +14,7 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
             e.ToTable("GameResults"); e.HasKey(x => x.Id);
             e.Property(x => x.PlayerName).HasMaxLength(20).IsRequired();
             e.Property(x => x.Mode).HasMaxLength(20).IsRequired();
+            e.Property(x => x.FlightLocationId).HasMaxLength(16);
             e.Property(x => x.Difficulty).HasConversion<string>().HasMaxLength(16).HasDefaultValue(Difficulty.Normal);
             e.HasIndex(x => new { x.Mode, x.Difficulty, x.Score, x.PlayedAtUtc });
             e.HasIndex(x => new { x.Mode, x.Difficulty, x.PlayedAtUtc, x.Id });
@@ -30,6 +31,7 @@ public sealed class GameDbContext(DbContextOptions<GameDbContext> options) : DbC
             e.Property(x => x.Id).ValueGeneratedNever();
             e.Property(x => x.PlayerName).HasMaxLength(20).IsRequired();
             e.Property(x => x.BirdSkinId).HasMaxLength(16).HasDefaultValue("sun");
+            e.Property(x => x.FlightLocationId).HasMaxLength(16).HasDefaultValue(FlightLocation.DefaultId);
         });
     }
 }

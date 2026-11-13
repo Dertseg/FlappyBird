@@ -13,16 +13,17 @@ internal sealed class BirdArt(BirdSkin skin)
     public void Draw(ICanvas canvas, float wingOffset = 0)
     {
         canvas.FillColor = shade;
-        canvas.FillEllipse(-17, -16, 36, 34);
+        float radius = (float)GameEngine.BirdRadius;
+        canvas.FillEllipse(-radius, -radius, 2 * radius, 2 * radius);
         canvas.FillColor = body;
-        canvas.FillEllipse(-17, -18, 34, 32);
+        canvas.FillEllipse(-16, -16, 31, 29);
         canvas.FillColor = wing;
-        canvas.FillEllipse(-18, wingOffset, 20, 12);
+        canvas.FillEllipse(-15, wingOffset - 2, 18, 10);
         canvas.FillColor = Colors.White;
-        canvas.FillEllipse(3, -13, 13, 15);
+        canvas.FillEllipse(2, -12, 12, 14);
         canvas.FillColor = Eye;
-        canvas.FillEllipse(10, -9, 5, 7);
+        canvas.FillEllipse(8, -9, 5, 7);
         canvas.FillColor = Beak;
-        canvas.FillRoundedRectangle(12, 0, 16, 8, 3);
+        canvas.FillRoundedRectangle(10, 0, 8, 6, 3);
     }
 }

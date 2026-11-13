@@ -13,7 +13,8 @@ public sealed class Pipe
 public sealed class GameEngine
 {
     public const double Width = 360, Height = 640, GroundY = 590;
-    public const double BirdX = 100, BirdRadius = 12, PipeWidth = 62, Gap = 166;
+    public const double BirdX = 100, BirdRadius = 16, PipeWidth = 62, Gap = 166;
+    public const double PipeRimOverhang = 4, PipeRimHeight = 18;
     public const double Step = 1.0 / 120, Speed = 130, Gravity = 950, FlapSpeed = -315;
     private readonly Random random;
     private readonly List<Pipe> pipes = [];
@@ -67,7 +68,7 @@ public sealed class GameEngine
             State = GameState.GameOver; return;
         }
         foreach (var pipe in pipes)
-            if (!pipe.Counted && pipe.X + PipeWidth < BirdX - BirdRadius) { pipe.Counted = true; Score++; }
+            if (!pipe.Counted && pipe.X + PipeWidth + PipeRimOverhang < BirdX - BirdRadius) { pipe.Counted = true; Score++; }
         if (pipes[0].X + PipeWidth < 0)
         {
             pipes.RemoveAt(0);
@@ -78,9 +79,11 @@ public sealed class GameEngine
     private double NextGap(double previous) => Math.Clamp(previous + random.Next(-70, 71), 175, 410);
     private bool Hits(Pipe p)
     {
-        // Circle against two rectangles: corners stay fair, unlike a bounding box collision.
-        return CircleRect(p.X, 0, PipeWidth, p.GapY - GapSize / 2)
-            || CircleRect(p.X, p.GapY + GapSize / 2, PipeWidth, GroundY - p.GapY - GapSize / 2);
+        double top = p.GapY - GapSize / 2, bottom = p.GapY + GapSize / 2;
+        return CircleRect(p.X, 0, PipeWidth, top)
+            || CircleRect(p.X, bottom, PipeWidth, GroundY - bottom)
+            || CircleRect(p.X - PipeRimOverhang, top - PipeRimHeight, PipeWidth + 2 * PipeRimOverhang, PipeRimHeight)
+            || CircleRect(p.X - PipeRimOverhang, bottom, PipeWidth + 2 * PipeRimOverhang, PipeRimHeight);
     }
     private bool CircleRect(double x, double y, double w, double h)
     {

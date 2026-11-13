@@ -4,11 +4,12 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>FlappyBird</RootNamespace>
     <UseMaui>true</UseMaui>
+    <MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
     <SingleProject>true</SingleProject>
     <ApplicationTitle>FlappyBird</ApplicationTitle>
     <ApplicationId>com.dertseg.flappybird</ApplicationId>
-    <ApplicationDisplayVersion>2.1.0</ApplicationDisplayVersion>
-    <ApplicationVersion>3</ApplicationVersion>
+    <ApplicationDisplayVersion>2.4.0</ApplicationDisplayVersion>
+    <ApplicationVersion>6</ApplicationVersion>
     <SupportedOSPlatformVersion>23.0</SupportedOSPlatformVersion>
     <AndroidPackageFormats>apk</AndroidPackageFormats>
     <!-- Preserve EF Core reflection in Release; optimize trimming separately. -->
@@ -16,6 +17,16 @@
     <RunAOTCompilation>false</RunAOTCompilation>
     <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
+    <RunAOTCompilation>true</RunAOTCompilation>
+    <AndroidEnableProfiledAot>true</AndroidEnableProfiledAot>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(Configuration)' == 'Release'">
+    <TrimmerRootAssembly Include="FlappyBird" />
+  </ItemGroup>
   <ItemGroup>
     <MauiIcon Include="Resources/AppIcon/appicon.svg" ForegroundFile="Resources/AppIcon/appiconfg.svg" Color="#102A43" />
     <MauiSplashScreen Include="Resources/Splash/splash.svg" Color="#102A43" BaseSize="128,128" />

@@ -37,6 +37,16 @@
         </Button></Grid></Border>
         <Label Text="{Binding DifficultyDescription}" Style="{StaticResource Subtitle}" />
       </VerticalStackLayout>
+      <Grid ColumnDefinitions="68,*" HeightRequest="50">
+        <Button Grid.ColumnSpan="2" Text="{Binding SelectedLocation.Name, StringFormat='Локация · {0}  ›'}"
+                Command="{Binding OpenLocationPickerCommand}" IsEnabled="{Binding CanInteract}"
+                Style="{StaticResource SecondaryButton}" Padding="64,0,10,0"
+                SemanticProperties.Description="{Binding LocationButtonDescription}" />
+        <Border Margin="7" StrokeThickness="0" StrokeShape="RoundRectangle 10" InputTransparent="True"
+                AutomationProperties.IsInAccessibleTree="False">
+          <controls:FlightLocationPreview Location="{Binding SelectedLocation}" />
+        </Border>
+      </Grid>
       <Button Text="Начать полёт  →" Command="{Binding StartCommand}" IsEnabled="{Binding CanInteract}" HeightRequest="58" />
       <Border Style="{StaticResource Card}" Padding="16">
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"><VerticalStackLayout Spacing="4" VerticalOptions="Center"><Label Text="Маленькие победы" FontAttributes="Bold" FontSize="16" /><Label Text="{Binding AchievementsSummary}" Style="{StaticResource Subtitle}" FontSize="12" /></VerticalStackLayout><Button Grid.Column="1" Text="Достижения →" Command="{Binding AchievementsCommand}" Style="{StaticResource GhostButton}" FontSize="12" Padding="8" /></Grid>
@@ -70,6 +80,39 @@
             </VerticalStackLayout>
             <controls:StatusBanner />
             <Button Text="Сохранить" Command="{Binding SaveSkinCommand}" />
+          </VerticalStackLayout>
+        </ScrollView>
+      </Border>
+    </Grid>
+    <Grid IsVisible="{Binding IsLocationPickerOpen}" BackgroundColor="#A6152C45" Padding="20" ZIndex="2">
+      <Border Style="{StaticResource Card}" MaximumWidthRequest="440" MaximumHeightRequest="360"
+              HorizontalOptions="Fill" VerticalOptions="Center">
+        <ScrollView>
+          <VerticalStackLayout Spacing="12">
+            <Grid ColumnDefinitions="*,Auto">
+              <VerticalStackLayout VerticalOptions="Center" Spacing="4">
+                <Label Text="Локации полёта" FontSize="24" FontAttributes="Bold" SemanticProperties.HeadingLevel="Level1" />
+                <Label Text="{Binding SelectedLocation.Name, StringFormat='Выбрана · {0}'}" Style="{StaticResource Subtitle}" />
+              </VerticalStackLayout>
+              <Button Grid.Column="1" Text="×" WidthRequest="48" Style="{StaticResource SecondaryButton}"
+                      Command="{Binding CloseLocationPickerCommand}" SemanticProperties.Description="Закрыть выбор локации" />
+            </Grid>
+            <VerticalStackLayout Spacing="6" BindableLayout.ItemsSource="{Binding Locations}" IsEnabled="{Binding CanInteract}">
+              <BindableLayout.ItemTemplate>
+                <DataTemplate x:DataType="models:FlightLocation">
+                  <Grid ColumnDefinitions="76,*" ColumnSpacing="10" HeightRequest="54">
+                    <Button Grid.ColumnSpan="2" Text="{Binding Name}" Style="{StaticResource SecondaryButton}" Padding="86,0,10,0"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type vm:HomeViewModel}}, Path=SelectLocationCommand, x:DataType=vm:HomeViewModel}"
+                            CommandParameter="{Binding .}" />
+                    <Border Margin="6" StrokeThickness="0" StrokeShape="RoundRectangle 10" InputTransparent="True"
+                            AutomationProperties.IsInAccessibleTree="False">
+                      <controls:FlightLocationPreview Location="{Binding .}" />
+                    </Border>
+                  </Grid>
+                </DataTemplate>
+              </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+            <controls:StatusBanner />
           </VerticalStackLayout>
         </ScrollView>
       </Border>

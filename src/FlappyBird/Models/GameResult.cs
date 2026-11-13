@@ -9,4 +9,5 @@ public sealed class GameResult
     public double DurationSeconds { get; set; }
     public Difficulty Difficulty { get; set; } = Difficulty.Normal;
     public string Mode { get; set; } = "Classic";
+    public string? FlightLocationId { get; set; }
 }

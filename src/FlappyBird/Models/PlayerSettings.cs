@@ -8,4 +8,5 @@ public sealed class PlayerSettings
     public bool SoundEnabled { get; set; } = true;
     public bool VibrationEnabled { get; set; } = true;
     public string BirdSkinId { get; set; } = "sun";
+    public string FlightLocationId { get; set; } = FlightLocation.DefaultId;
 }

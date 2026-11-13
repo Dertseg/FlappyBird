@@ -47,6 +47,10 @@ namespace FlappyBird.Data.Migrations
                     b.Property<double>("DurationSeconds")
                         .HasColumnType("REAL");
 
+                    b.Property<string>("FlightLocationId")
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Mode")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -90,6 +94,13 @@ namespace FlappyBird.Data.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("TEXT")
                         .HasDefaultValue("Normal");
+
+                    b.Property<string>("FlightLocationId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("meadow");
 
                     b.Property<string>("PlayerName")
                         .IsRequired()

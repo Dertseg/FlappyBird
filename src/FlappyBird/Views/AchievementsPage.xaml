@@ -13,7 +13,7 @@
           <Border.Triggers><DataTrigger TargetType="Border" Binding="{Binding IsUnlocked}" Value="True"><Setter Property="Stroke" Value="#D5B56C" /><Setter Property="BackgroundColor" Value="#FFFCF4" /></DataTrigger></Border.Triggers>
           <VerticalStackLayout Spacing="14">
             <Grid ColumnDefinitions="54,*" ColumnSpacing="14">
-              <Border BackgroundColor="#E8EDF5" StrokeThickness="0" StrokeShape="RoundRectangle 17" HeightRequest="54" VerticalOptions="Start"><Border.Triggers><DataTrigger TargetType="Border" Binding="{Binding IsUnlocked}" Value="True"><Setter Property="BackgroundColor" Value="#F8E5B9" /></DataTrigger></Border.Triggers><Label Text="{Binding Symbol}" FontAttributes="Bold" FontSize="21" HorizontalTextAlignment="Center" VerticalTextAlignment="Center" /></Border>
+              <Border BackgroundColor="#E8EDF5" StrokeThickness="0" StrokeShape="RoundRectangle 17" HeightRequest="54" VerticalOptions="Start"><Border.Triggers><DataTrigger TargetType="Border" Binding="{Binding IsUnlocked}" Value="True"><Setter Property="BackgroundColor" Value="#F8E5B9" /></DataTrigger></Border.Triggers><Image Source="{Binding Icon}" WidthRequest="30" HeightRequest="30" HorizontalOptions="Center" VerticalOptions="Center" AutomationProperties.IsInAccessibleTree="False" /></Border>
               <VerticalStackLayout Grid.Column="1" Spacing="5"><Label Text="{Binding Title}" FontAttributes="Bold" FontSize="20" /><Label Text="{Binding Description}" Style="{StaticResource Subtitle}" FontSize="13" /></VerticalStackLayout>
             </Grid>
             <ProgressBar Progress="{Binding Progress}" />
@@ -22,8 +22,8 @@
         </Border>
       </DataTemplate></BindableLayout.ItemTemplate>
     </VerticalStackLayout>
-    <Label Text="Полученные награды сохраняются на этом устройстве. Старые полёты тоже учитываются." Style="{StaticResource Subtitle}" FontSize="12" />
-    <controls:StatusBanner /><Button Text="Обновить достижения" Command="{Binding LoadCommand}" Style="{StaticResource SecondaryButton}" />
+    <Label Text="Полученные награды сохраняются на этом устройстве. Старые полёты учитываются в общих достижениях." Style="{StaticResource Subtitle}" FontSize="12" />
+    <controls:StatusBanner />
   </VerticalStackLayout></ScrollView>
 
 </ContentPage>

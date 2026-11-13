@@ -16,5 +16,5 @@ public partial class AchievementsViewModel(IGameStore store) : BaseViewModel(sto
         int earned = Achievements.Count(x => x.IsUnlocked);
         Summary = $"Открыто {earned} из {Achievements.Count}";
         Completion = Achievements.Count == 0 ? 0 : (double)earned / Achievements.Count;
-    }, "Не удалось загрузить достижения. Нажми «Обновить».");
+    }, "Не удалось загрузить достижения. Открой этот экран снова.");
 }

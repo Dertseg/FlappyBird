@@ -36,6 +36,18 @@ foreach (var option in DifficultyCatalog.All)
 }
 GameEngine Simulate(int hz) { var g = new GameEngine(1); g.Flap(); for (int i = 0; i < hz / 2; i++) g.Advance(1.0 / hz); return g; }
 Check(Math.Abs(Simulate(30).BirdY - Simulate(120).BirdY) < .01, "Physics independent of render cadence");
+var rimCollision = new GameEngine(1);
+rimCollision.Flap();
+rimCollision.Advance(.1);
+rimCollision.Advance(.1);
+rimCollision.Advance(.1);
+((List<Pipe>)rimCollision.Pipes)[0] = new Pipe
+{
+    X = GameEngine.BirdX + GameEngine.BirdRadius + 2 + rimCollision.PipeSpeed * GameEngine.Step,
+    GapY = rimCollision.BirdY + 8 + rimCollision.GapSize / 2
+};
+rimCollision.Advance(GameEngine.Step);
+Check(rimCollision.State == GameState.GameOver, "Visible pipe rim collides outside the pipe body");
 Check(MedalProgress.Next(9).Contains("1 очк.") && MedalProgress.Next(10).Contains("15 очк."), "Next medal boundary");
 Check(MedalProgress.Next(25).Contains("25 очк.") && MedalProgress.Fraction(100) == 1, "Silver and platinum thresholds");
 
@@ -54,7 +66,7 @@ try
     var store = new SqliteGameStore(path); await store.InitializeAsync(); await store.InitializeAsync();
     using (var db = Context(path))
     {
-        Check(db.Database.GetAppliedMigrations().Count() == 3, "All migrations applied once");
+        Check(db.Database.GetAppliedMigrations().Count() == 5, "All migrations applied once");
         Check(!db.Database.HasPendingModelChanges(), "Snapshot matches current model");
         var legacy = db.Results.Single();
         Check(legacy.Id == legacyId && legacy.Score == 25 && legacy.Difficulty == Difficulty.Normal, "Legacy scores survive as Normal");
@@ -170,7 +182,9 @@ try
     var attempts = (await store.GetStatisticsAsync()).Attempts;
     for (int i = attempts; i < 100; i++) await store.SaveResultAsync(Result(0));
     achievements = await store.GetAchievementsAsync();
-    Check(achievements.All(x => x.IsUnlocked), "Hundred attempts achievement");
+    Check(achievements.Where(x => x.Definition.LocationId is null).All(x => x.IsUnlocked), "Hundred attempts achievement");
+    Check(achievements.Count == 17 && achievements.Where(x => x.Definition.LocationId is not null).All(x => x.Current == 0),
+        "Legacy results retain global progress without guessing locations");
     Check((await store.GetStatisticsAsync()).Attempts == 100, "Duplicates do not contribute to attempts");
     await records.SelectListCommand.ExecuteAsync("History");
     await records.SelectDifficultyCommand.ExecuteAsync("Normal");
@@ -180,11 +194,21 @@ try
     Check(records.Flights.Count == 1 && records.Flights[0].Score == 60, "History filters by difficulty");
     var reopened = new SqliteGameStore(path); await reopened.InitializeAsync();
     Check((await reopened.GetAchievementsAsync())[0].UnlockedAtUtc == unlockDate, "Unlock dates survive reopening");
-    Check((await reopened.GetAchievementsAsync()).All(x => x.IsUnlocked), "Achievements durable");
+    Check((await reopened.GetAchievementsAsync()).Where(x => x.Definition.LocationId is null).All(x => x.IsUnlocked), "Achievements durable");
     Check((await reopened.GetSettingsAsync()).DefaultDifficulty == Difficulty.Hard, "Difficulty durable");
     var achievementsVm = new AchievementsViewModel(reopened); await achievementsVm.LoadCommand.ExecuteAsync(null);
-    Check(achievementsVm.Completion == 1 && achievementsVm.Achievements.Count == AchievementCatalog.All.Count, "Achievements page progress");
-    using (var db = Context(path)) Check(db.Achievements.Count() == AchievementCatalog.All.Count, "No duplicate unlock rows");
+    Check(achievementsVm.Completion == 7d / 17 && achievementsVm.Achievements.Count == AchievementCatalog.All.Count, "Achievements page progress");
+    using (var db = Context(path)) Check(db.Achievements.Count() == 7, "No duplicate unlock rows");
+    bool notified = false;
+    reopened.ResultsChanged += () => notified = true;
+    var coastalResult = Result(10);
+    coastalResult.FlightLocationId = "coast";
+    var coastalAwards = await reopened.SaveResultAsync(coastalResult);
+    Check(notified && coastalAwards.NewAchievementIds.Contains("coast_1") && coastalAwards.NewAchievementIds.Contains("coast_10"),
+        "Saving a coastal flight publishes the committed awards");
+    var locationAwards = await reopened.GetAchievementsAsync();
+    Check(locationAwards.Single(x => x.Definition.Id == "coast_runs").Current == 1 &&
+        locationAwards.Single(x => x.Definition.Id == "peaks_1").Current == 0, "Location progress is independent");
     bool rejected = false;
     try { await store.SaveResultAsync(Result(-1)); } catch (ArgumentException) { rejected = true; }
     Check(rejected, "Invalid score rejected");
@@ -221,6 +245,70 @@ try
     Check(failing.IsReady && failing.Engine.SessionId != id && (await store.GetStatisticsAsync()).Attempts == 1, "Explicit discard permits replay without adding attempt");
 }
 finally { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); File.Delete(freshPath); }
+var recoveryPath = Path.Combine(Path.GetTempPath(), "flappy-recovery-" + Guid.NewGuid() + ".db");
+try
+{
+    var original = new SqliteGameStore(recoveryPath);
+    await original.InitializeAsync();
+    var pending = Result(10);
+    using (var db = Context(recoveryPath)) db.Database.ExecuteSqlRaw("CREATE TRIGGER fail_result BEFORE INSERT ON GameResults BEGIN SELECT RAISE(ABORT, 'test failure'); END");
+    bool failed = false;
+    try { await original.SaveResultAsync(pending); } catch (DbUpdateException) { failed = true; }
+    Check(failed && File.Exists(Path.Combine(recoveryPath + ".pending", pending.Id + ".json")), "SQLite failure leaves durable journal");
+    using (var db = Context(recoveryPath)) db.Database.ExecuteSqlRaw("DROP TRIGGER fail_result");
+    Directory.CreateDirectory(recoveryPath + ".pending");
+    File.WriteAllText(Path.Combine(recoveryPath + ".pending", pending.Id + ".json"), System.Text.Json.JsonSerializer.Serialize(pending));
+    File.WriteAllText(Path.Combine(recoveryPath + ".pending", Guid.NewGuid() + ".json"), "{ truncated");
+    File.WriteAllText(Path.Combine(recoveryPath + ".pending", Guid.NewGuid() + ".json"), "{}");
+    var restored = new SqliteGameStore(recoveryPath);
+    await restored.InitializeAsync();
+    Check((await restored.GetTopAsync(Difficulty.Normal)).Single().Id == pending.Id, "Process restart recovers pending result");
+    Check(Directory.GetFiles(recoveryPath + ".pending", "*.invalid").Length == 2,
+        "Malformed and invalid journal files are isolated without blocking valid results");
+    Check((await restored.GetAchievementsAsync()).Count(x => x.IsUnlocked) == 2, "Recovery grants achievements atomically");
+    await restored.SaveResultAsync(pending);
+    Check((await restored.GetStatisticsAsync()).Attempts == 1, "Recovery and retry do not duplicate result");
+    if (OperatingSystem.IsWindows())
+    {
+        string committedFile = Path.Combine(recoveryPath + ".pending", pending.Id + ".json");
+        File.WriteAllText(committedFile, System.Text.Json.JsonSerializer.Serialize(pending));
+        using (File.Open(committedFile, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            await restored.SaveResultAsync(pending);
+            Check((await new SqliteGameStore(recoveryPath).GetStatisticsAsync()).Attempts == 1 && File.Exists(committedFile),
+                "A locked journal for a committed result cannot fail retry or startup");
+        }
+        await restored.SaveResultAsync(pending);
+        Check(!File.Exists(committedFile), "A later retry cleans the unlocked journal");
+    }
+    var vm = new GameViewModel(restored, new ThrowingFeedback(), new FakeNavigation());
+    await vm.PrepareAsync(Difficulty.Normal);
+    vm.FlapCommand.Execute(null); vm.PauseCommand.Execute(null); vm.FinishCommand.Execute(null);
+    await vm.SaveResultCommand.ExecutionTask!;
+    Check(!vm.CanRetrySave && (await restored.GetStatisticsAsync()).Attempts == 2, "Feedback failures cannot prevent saving");
+    var settings = new SettingsViewModel(restored);
+    await settings.LoadCommand.ExecuteAsync(null);
+    settings.PlayerName = "Черновик";
+    await restored.SaveBirdSkinAsync("sky");
+    if (settings.NeedsReload && !settings.IsDirty) await settings.LoadCommand.ExecuteAsync(null);
+    Check(settings.PlayerName == "Черновик" && settings.IsDirty, "Unrelated writes preserve settings draft");
+    await settings.SaveCommand.ExecuteAsync(null);
+    Check(!settings.IsDirty && (await restored.GetSettingsAsync()).PlayerName == "Черновик", "Saving clears draft state");
+    Check((await restored.GetSettingsAsync()).FlightLocationId == FlightLocation.DefaultId, "Existing profile starts in classic location");
+    var home = new HomeViewModel(restored, new FakeNavigation(), vm);
+    home.OpenLocationPickerCommand.Execute(null);
+    Check(home.Locations.Count == 4, "Home picker offers all four locations");
+    await home.SelectLocationCommand.ExecuteAsync(FlightLocation.Get("peaks"));
+    await restored.SaveSettingsAsync(await restored.GetSettingsAsync());
+    Check(!home.IsLocationPickerOpen && home.SelectedLocation.Id == "peaks" &&
+        (await new SqliteGameStore(recoveryPath).GetSettingsAsync()).FlightLocationId == "peaks", "Location selection survives restart");
+    Check(await vm.PrepareAsync(Difficulty.Normal) && vm.Location.Id == "peaks", "Flight uses selected location");
+}
+finally
+{
+    Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); File.Delete(recoveryPath);
+    if (Directory.Exists(recoveryPath + ".pending")) Directory.Delete(recoveryPath + ".pending", true);
+}
 Console.WriteLine($"PASS: {assertions} assertions. Three difficulties, physics, five ViewModels, migration from v1, SQLite results and achievements.");
 
 sealed class SilentFeedback : IGameFeedback { public void Play(string sound) { } public void Vibrate() { } }
@@ -237,6 +325,7 @@ sealed class FakeNavigation : INavigationService
 }
 sealed class FaultStore(IGameStore inner) : IGameStore
 {
+    public event Action? ResultsChanged { add => inner.ResultsChanged += value; remove => inner.ResultsChanged -= value; }
     public long Revision => inner.Revision;
     private bool fail = true;
     public bool FailTop { get; set; }
@@ -252,9 +341,12 @@ sealed class FaultStore(IGameStore inner) : IGameStore
     public Task<PlayerSettings> GetSettingsAsync() => inner.GetSettingsAsync();
     public Task SaveSettingsAsync(PlayerSettings settings) => inner.SaveSettingsAsync(settings);
     public Task SaveBirdSkinAsync(string id) => inner.SaveBirdSkinAsync(id);
+    public Task SaveFlightLocationAsync(string id) => inner.SaveFlightLocationAsync(id);
     public Task<SaveOutcome> SaveResultAsync(GameResult result)
     {
         if (fail) { fail = false; throw new IOException("Simulated disk failure"); }
         return inner.SaveResultAsync(result);
     }
 }
+
+sealed class ThrowingFeedback : IGameFeedback { public void Play(string sound) => throw new InvalidOperationException("Audio failure"); public void Vibrate() => throw new InvalidOperationException("Haptic failure"); }

@@ -1,13 +1,64 @@
 using FlappyBird.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 namespace FlappyBird.Data;
 /// <summary>Serialized SQLite access; each result and its achievements commit atomically.</summary>
 public sealed class SqliteGameStore(string databasePath) : IGameStore
 {
     private readonly SemaphoreSlim gate = new(1, 1);
+    private string PendingDirectory => databasePath + ".pending";
+    public void DiscardPendingResult(Guid id) => File.Delete(Path.Combine(PendingDirectory, id + ".json"));
+
+    private static void TryCleanJournal(Action cleanup)
+    {
+        try { cleanup(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            System.Diagnostics.Debug.WriteLine(ex);
+        }
+    }
+
+    private static bool IsValid(GameResult result) =>
+        result.Id != Guid.Empty && result.Score >= 0 && double.IsFinite(result.DurationSeconds) &&
+        result.DurationSeconds >= 0 && Enum.IsDefined(result.Difficulty) && result.Mode == "Classic" &&
+        result.PlayedAtUtc != default && !string.IsNullOrWhiteSpace(result.PlayerName) && result.PlayerName.Length <= 20 &&
+        (result.FlightLocationId is null || FlightLocation.Get(result.FlightLocationId).Id == result.FlightLocationId);
+
+    private static GameResult? ReadJournal(string file)
+    {
+        try
+        {
+            using var stream = File.OpenRead(file);
+            var result = JsonSerializer.Deserialize<GameResult>(stream);
+            return result is not null && IsValid(result) && Path.GetFileNameWithoutExtension(file) == result.Id.ToString()
+                ? result : null;
+        }
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+        {
+            System.Diagnostics.Debug.WriteLine(ex);
+            return null;
+        }
+    }
+    private void Journal(GameResult result)
+    {
+        Directory.CreateDirectory(PendingDirectory);
+        string target = Path.Combine(PendingDirectory, result.Id + ".json");
+        string temporary = target + "." + Guid.NewGuid() + ".tmp";
+        try
+        {
+            using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                JsonSerializer.Serialize(stream, result);
+                stream.Flush(true);
+            }
+            File.Move(temporary, target, true);
+        }
+        finally { TryCleanJournal(() => File.Delete(temporary)); }
+    }
     private bool initialized;
     private long revision;
     public long Revision => Interlocked.Read(ref revision);
+    public event Action? ResultsChanged;
     private readonly DbContextOptions<GameDbContext> options = new DbContextOptionsBuilder<GameDbContext>()
         .UseSqlite(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = databasePath, ForeignKeys = true }.ToString()).Options;
     private async Task<T> RunAsync<T>(Func<GameDbContext, T> action)
@@ -32,15 +83,21 @@ public sealed class SqliteGameStore(string databasePath) : IGameStore
         var levels = ClassicResults(db).GroupBy(x => x.Difficulty)
             .Select(group => new { Difficulty = group.Key, Attempts = group.Count(), Best = group.Max(x => x.Score) })
             .ToArray();
+        var locations = ClassicResults(db).Where(x => x.FlightLocationId != null)
+            .GroupBy(x => x.FlightLocationId)
+            .Select(group => new { Location = group.Key, Attempts = group.Count(), Best = group.Max(x => x.Score) })
+            .ToDictionary(x => x.Location!, x => new LocationStatistics(x.Attempts, x.Best));
         return new GameStatistics(levels.Sum(x => x.Attempts), levels.Select(x => x.Best).DefaultIfEmpty().Max())
         {
-            BestByDifficulty = levels.ToDictionary(x => x.Difficulty, x => x.Best)
+            BestByDifficulty = levels.ToDictionary(x => x.Difficulty, x => x.Best),
+            ByLocation = locations
         };
     }
     private static IReadOnlyList<string> Unlock(GameDbContext db)
     {
-        var stats = Statistics(db);
         var unlocked = db.Achievements.Select(x => x.Id).ToHashSet();
+        if (AchievementCatalog.All.All(x => unlocked.Contains(x.Id))) return [];
+        var stats = Statistics(db);
         var earned = AchievementCatalog.All.Where(x => AchievementCatalog.Current(x, stats) >= x.Goal && !unlocked.Contains(x.Id)).ToArray();
         foreach (var definition in earned) db.Achievements.Add(new Achievement { Id = definition.Id, UnlockedAtUtc = DateTime.UtcNow });
         db.SaveChanges(); return earned.Select(x => x.Id).ToArray();
@@ -52,24 +109,53 @@ public sealed class SqliteGameStore(string databasePath) : IGameStore
         if (initialized) return;
         db.Database.Migrate();
         using var transaction = db.Database.BeginTransaction();
+        var recoveredFiles = new List<string>();
+        foreach (var file in Directory.Exists(PendingDirectory) ? Directory.GetFiles(PendingDirectory, "*.json") : [])
+        {
+            var result = ReadJournal(file);
+            if (result is null)
+            {
+                TryCleanJournal(() => File.Move(file, file + "." + Guid.NewGuid() + ".invalid"));
+                continue;
+            }
+            if (!db.Results.Any(x => x.Id == result.Id)) { db.Results.Add(result); db.SaveChanges(); }
+            recoveredFiles.Add(file);
+        }
         Unlock(db); // Existing attempts count when upgrading from version 1.
         transaction.Commit();
         initialized = true;
+        foreach (var file in recoveredFiles) TryCleanJournal(() => File.Delete(file));
     }
     public async Task<SaveOutcome> SaveResultAsync(GameResult result)
     {
-        if (result.Id == Guid.Empty || result.Score < 0 || !double.IsFinite(result.DurationSeconds) || result.DurationSeconds < 0 ||
-            !Enum.IsDefined(result.Difficulty) || result.Mode != "Classic") throw new ArgumentException("Invalid game result");
-        return await RunAsync(db =>
+        if (!IsValid(result)) throw new ArgumentException("Invalid game result", nameof(result));
+        bool inserted = false;
+        var outcome = await RunAsync(db =>
         {
             using var transaction = db.Database.BeginTransaction();
-            if (db.Results.Any(x => x.Id == result.Id)) return new SaveOutcome([]);
+            if (db.Results.Any(x => x.Id == result.Id))
+            {
+                TryCleanJournal(() => DiscardPendingResult(result.Id));
+                return new SaveOutcome([]);
+            }
+            Journal(result);
             db.Results.Add(result); db.SaveChanges();
             var achievements = Unlock(db);
             transaction.Commit();
             Interlocked.Increment(ref revision);
+            inserted = true;
+            TryCleanJournal(() => DiscardPendingResult(result.Id));
             return new SaveOutcome(achievements);
         });
+        if (inserted && ResultsChanged is { } listeners)
+        {
+            foreach (Action listener in listeners.GetInvocationList())
+            {
+                try { listener(); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine(ex); }
+            }
+        }
+        return outcome;
     }
     public async Task<IReadOnlyList<GameResult>> GetTopAsync(Difficulty difficulty)
     {
@@ -138,6 +224,18 @@ public sealed class SqliteGameStore(string databasePath) : IGameStore
         return RunAsync(db =>
         {
             EditSettings(db).BirdSkinId = id;
+            db.SaveChanges();
+            Interlocked.Increment(ref revision);
+            return true;
+        });
+    }
+
+    public Task SaveFlightLocationAsync(string id)
+    {
+        if (FlightLocation.Get(id).Id != id) throw new ArgumentException("Invalid flight location", nameof(id));
+        return RunAsync(db =>
+        {
+            EditSettings(db).FlightLocationId = id;
             db.SaveChanges();
             Interlocked.Increment(ref revision);
             return true;

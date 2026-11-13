@@ -15,10 +15,10 @@ public partial class HomePage : ContentPage
 
     private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(HomeViewModel.IsSkinPickerOpen) &&
+        if (e.PropertyName is (nameof(HomeViewModel.IsSkinPickerOpen) or nameof(HomeViewModel.IsLocationPickerOpen)) &&
             HomeContent.Handler?.PlatformView is Android.Views.View background)
         {
-            background.ImportantForAccessibility = vm.IsSkinPickerOpen
+            background.ImportantForAccessibility = vm.IsSkinPickerOpen || vm.IsLocationPickerOpen
                 ? ImportantForAccessibility.NoHideDescendants
                 : ImportantForAccessibility.Auto;
         }
@@ -32,11 +32,17 @@ public partial class HomePage : ContentPage
     protected override void OnDisappearing()
     {
         vm.CloseSkinPickerCommand.Execute(null);
+        vm.CloseLocationPickerCommand.Execute(null);
         base.OnDisappearing();
     }
 
     protected override bool OnBackButtonPressed()
     {
+        if (vm.IsLocationPickerOpen)
+        {
+            vm.CloseLocationPickerCommand.Execute(null);
+            return true;
+        }
         if (!vm.IsSkinPickerOpen) return base.OnBackButtonPressed();
         vm.CloseSkinPickerCommand.Execute(null);
         return true;

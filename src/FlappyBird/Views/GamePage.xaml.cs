@@ -18,7 +18,7 @@ public partial class GamePage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing(); vm.FrameChanged += GameCanvas.Invalidate; vm.PropertyChanged += OnVmChanged;
-        GameCanvas.Drawable = new GameRenderer(vm.Engine, vm.Skin);
+        GameCanvas.Drawable = new GameRenderer(vm.Engine, vm.Skin, vm.Location);
         UpdateTimer(); GameCanvas.Invalidate();
     }
     protected override void OnDisappearing()
